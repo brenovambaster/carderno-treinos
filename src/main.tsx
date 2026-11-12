@@ -12,6 +12,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
+import { CorDaBarra } from './componentes/Aparencia';
 import { criarServidorSupabase } from './dados/servidorSupabase';
 import type { Servidor } from './dados/servidor';
 import { tema } from './tema';
@@ -23,8 +24,9 @@ async function iniciar() {
       : criarServidorSupabase();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <ThemeProvider theme={tema}>
+      <ThemeProvider theme={tema} noSsr disableTransitionOnChange>
         <CssBaseline enableColorScheme />
+        <CorDaBarra />
         <App servidor={servidor} />
       </ThemeProvider>
     </StrictMode>,

@@ -17,6 +17,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { EscolherTema } from '../componentes/Aparencia';
 import { Atividade } from '../componentes/Atividade';
 import { Cabecalho, Secao } from '../componentes/Pagina';
 import { useApp } from '../contexto';
@@ -293,6 +294,10 @@ export function TelaPlano() {
             ['Sono', '7–8 horas. É no descanso que o músculo cresce.'],
           ]}
         />
+      </Secao>
+
+      <Secao titulo="Aparência" subtitulo="No automático, o app fica claro ou escuro igual ao celular.">
+        <EscolherTema />
       </Secao>
 
       <Secao titulo="Seus dados">

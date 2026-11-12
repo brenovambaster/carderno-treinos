@@ -1,9 +1,9 @@
 // Gráfico de linha (MUI X Charts) para carga, repetições, peso e cintura ao longo do tempo.
-import useMediaQuery from '@mui/material/useMediaQuery';
 import { LineChart, lineClasses } from '@mui/x-charts/LineChart';
 import { ddmm } from '../lib/datas';
 import { fmt } from '../lib/formato';
 import { coresDoEsquema } from '../tema';
+import { useEscuro } from './Aparencia';
 
 import type { Ponto } from './Grafico';
 
@@ -16,7 +16,7 @@ export default function GraficoLinha({
   unidade: string;
   sufixo?: string;
 }) {
-  const cores = coresDoEsquema(useMediaQuery('(prefers-color-scheme: dark)'));
+  const cores = coresDoEsquema(useEscuro());
   const ys = pontos.map((p) => p.y);
   const lo = Math.min(...ys);
   const hi = Math.max(...ys);

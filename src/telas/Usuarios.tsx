@@ -61,9 +61,10 @@ function AvatarUsuario({ u, tamanho = 40 }: { u: UsuarioPainel; tamanho?: number
         height: tamanho,
         fontSize: tamanho * 0.4,
         fontWeight: 700,
-        bgcolor: corDe(u.email),
-        color: '#fff',
-        opacity: u.ativo ? 1 : 0.45,
+        // Inativo fica cinza (em vez de transparente), para as iniciais continuarem legíveis.
+        ...(u.ativo
+          ? { bgcolor: corDe(u.email), color: '#fff' }
+          : { bgcolor: 'background.default', color: 'text.secondary', border: 1, borderColor: 'divider' }),
       }}
     >
       {iniciais(u)}

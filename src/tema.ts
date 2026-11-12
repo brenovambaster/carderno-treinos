@@ -1,5 +1,5 @@
 // Tema do app (MUI). Mantém a identidade do caderno: azul de anilha como acento,
-// títulos em Barlow Condensed e texto em Source Sans 3. Claro ou escuro segue o aparelho.
+// títulos em Barlow Condensed e texto em Source Sans 3. Claro, escuro ou automático (igual ao aparelho).
 import { createTheme } from '@mui/material/styles';
 
 const DISPLAY = "'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif";
@@ -24,21 +24,29 @@ const CLARO = {
   divider: '#E1E5EA',
 };
 
+// No escuro, os botões cheios têm texto escuro. O MUI escurece a cor no hover (variante "dark"),
+// o que derrubaria o contraste do texto; aqui o hover clareia um pouco em vez de escurecer.
 const ESCURO = {
-  primary: { main: '#7398FF', contrastText: '#0B1020' },
-  secondary: { main: '#5EEAD4' },
-  success: { main: '#5BD58A' },
-  warning: { main: '#F0A55A' },
-  error: { main: '#FF7A6B' },
+  primary: { main: '#7398FF', dark: '#8FADFF', contrastText: '#0B1020' },
+  secondary: { main: '#5EEAD4', dark: '#86F0DF' },
+  success: { main: '#5BD58A', dark: '#7DE0A3' },
+  warning: { main: '#F0A55A', dark: '#F5BA7E' },
+  error: { main: '#FF7A6B', dark: '#FF978B' },
   background: { default: '#0E1114', paper: '#171B20' },
   text: { primary: '#E7EAEE', secondary: '#97A1AC' },
   divider: '#2A3139',
 };
 
 export const tema = createTheme({
-  // Claro ou escuro pela preferência do aparelho (media query), sem precisar de JavaScript.
-  cssVariables: true,
-  colorSchemes: { light: { palette: CLARO }, dark: { palette: ESCURO } },
+  // O esquema em uso vai no atributo data-tema do <html>, para a pessoa poder escolher
+  // claro ou escuro no Perfil. No automático, o MUI segue a preferência do aparelho.
+  cssVariables: { colorSchemeSelector: 'data-tema' },
+  colorSchemes: {
+    // Placeholder (como a carga sugerida na série) mais forte que o padrão do MUI (0,42 e 0,5),
+    // para ler bem nos dois temas (contraste ≥ 4,5:1), mas ainda mais claro que o valor digitado.
+    light: { palette: CLARO, opacity: { inputPlaceholder: 0.62 } },
+    dark: { palette: ESCURO, opacity: { inputPlaceholder: 0.55 } },
+  },
   shape: { borderRadius: 12 },
   typography: {
     fontFamily: CORPO,
