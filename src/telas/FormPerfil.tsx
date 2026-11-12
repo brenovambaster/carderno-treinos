@@ -1,3 +1,10 @@
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
+import Grid from '@mui/material/Grid';
+import InputAdornment from '@mui/material/InputAdornment';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import { useState, type FormEvent } from 'react';
 import { hojeISO, idade } from '../lib/datas';
 import { num } from '../lib/formato';
@@ -60,90 +67,104 @@ export function FormPerfil({ inicial, comPeso, aoSalvar, aoCancelar, rotuloBotao
         comPeso ? peso : null,
       );
     } catch {
-      setErro(navigator.onLine ? 'Não consegui salvar agora. Tente de novo.' : 'Sem conexão: o perfil precisa de internet para salvar.');
+      setErro(
+        navigator.onLine
+          ? 'Não consegui salvar agora. Tente de novo.'
+          : 'Sem conexão: o perfil precisa de internet para salvar.',
+      );
       setSalvando(false);
     }
   }
 
+  const maiuscula = (r: string) => r[0].toUpperCase() + r.slice(1);
+
   return (
-    <form className="card" onSubmit={enviar} noValidate>
-      <div className="row2">
-        <label className="lbl" htmlFor="p-sexo">
-          Sexo
-          <select id="p-sexo" value={f.sexo} onChange={mudar('sexo')}>
-            <option value="" disabled>
-              Escolha
-            </option>
-            <option value="M">Homem</option>
-            <option value="F">Mulher</option>
-          </select>
-        </label>
-        <label className="lbl" htmlFor="p-nasc">
-          Nascimento
-          <input type="date" id="p-nasc" max={hoje} value={f.nascimento} onChange={mudar('nascimento')} />
-        </label>
-        <label className="lbl" htmlFor="p-altura">
-          Altura (cm)
-          <input className="n" id="p-altura" inputMode="decimal" placeholder="171" autoComplete="off" value={f.altura} onChange={mudar('altura')} />
-        </label>
+    <Stack component="form" spacing={2} onSubmit={enviar} noValidate>
+      <Grid container spacing={2}>
+        <Grid size={6}>
+          <TextField select label="Sexo" value={f.sexo} onChange={mudar('sexo')}>
+            <MenuItem value="M">Homem</MenuItem>
+            <MenuItem value="F">Mulher</MenuItem>
+          </TextField>
+        </Grid>
+        <Grid size={6}>
+          <TextField
+            type="date"
+            label="Nascimento"
+            value={f.nascimento}
+            onChange={mudar('nascimento')}
+            slotProps={{ htmlInput: { max: hoje }, inputLabel: { shrink: true } }}
+          />
+        </Grid>
+        <Grid size={6}>
+          <TextField
+            label="Altura"
+            placeholder="171"
+            value={f.altura}
+            onChange={mudar('altura')}
+            slotProps={{
+              htmlInput: { inputMode: 'decimal', autoComplete: 'off' },
+              input: { endAdornment: <InputAdornment position="end">cm</InputAdornment> },
+            }}
+          />
+        </Grid>
         {comPeso && (
-          <label className="lbl" htmlFor="p-peso">
-            Peso hoje (kg)
-            <input className="n" id="p-peso" inputMode="decimal" placeholder="75,0" autoComplete="off" value={f.peso} onChange={mudar('peso')} />
-          </label>
+          <Grid size={6}>
+            <TextField
+              label="Peso hoje"
+              placeholder="75,0"
+              value={f.peso}
+              onChange={mudar('peso')}
+              slotProps={{
+                htmlInput: { inputMode: 'decimal', autoComplete: 'off' },
+                input: { endAdornment: <InputAdornment position="end">kg</InputAdornment> },
+              }}
+            />
+          </Grid>
         )}
-        <label className="lbl" htmlFor="p-trab">
-          Trabalho
-          <select id="p-trab" value={f.tipoTrabalho} onChange={mudar('tipoTrabalho')}>
-            <option value="" disabled>
-              Escolha
-            </option>
+        <Grid size={6}>
+          <TextField select label="Trabalho" value={f.tipoTrabalho} onChange={mudar('tipoTrabalho')}>
             {Object.entries(TIPOS_TRABALHO).map(([v, r]) => (
-              <option key={v} value={v}>
-                {r[0].toUpperCase() + r.slice(1)}
-              </option>
+              <MenuItem key={v} value={v}>
+                {maiuscula(r)}
+              </MenuItem>
             ))}
-          </select>
-        </label>
-        <label className="lbl" htmlFor="p-obj">
-          Objetivo
-          <select id="p-obj" value={f.objetivo} onChange={mudar('objetivo')}>
-            <option value="" disabled>
-              Escolha
-            </option>
+          </TextField>
+        </Grid>
+        <Grid size={6}>
+          <TextField select label="Objetivo" value={f.objetivo} onChange={mudar('objetivo')}>
             {Object.entries(OBJETIVOS).map(([v, r]) => (
-              <option key={v} value={v}>
-                {r[0].toUpperCase() + r.slice(1)}
-              </option>
+              <MenuItem key={v} value={v}>
+                {maiuscula(r)}
+              </MenuItem>
             ))}
-          </select>
-        </label>
-        <label className="lbl" htmlFor="p-meta">
-          Treinos por semana
-          <select id="p-meta" value={f.metaSemanal} onChange={mudar('metaSemanal')}>
+          </TextField>
+        </Grid>
+        <Grid size={comPeso ? 12 : 6}>
+          <TextField select label="Treinos por semana" value={f.metaSemanal} onChange={mudar('metaSemanal')}>
             {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <option key={n} value={n}>
+              <MenuItem key={n} value={String(n)}>
                 {n}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </label>
-      </div>
+          </TextField>
+        </Grid>
+      </Grid>
       {erro && (
-        <p className="erro small" role="alert">
+        <Alert severity="error" role="alert">
           {erro}
-        </p>
+        </Alert>
       )}
-      <div className="btn-row">
-        <button className="btn" type="submit" disabled={salvando}>
-          {salvando ? 'Salvando…' : rotuloBotao}
-        </button>
+      <Stack direction="row" spacing={1}>
+        <Button type="submit" variant="contained" size="large" loading={salvando}>
+          {rotuloBotao}
+        </Button>
         {aoCancelar && (
-          <button className="btn ghost" type="button" onClick={aoCancelar} disabled={salvando}>
+          <Button variant="outlined" size="large" onClick={aoCancelar} disabled={salvando}>
             Cancelar
-          </button>
+          </Button>
         )}
-      </div>
-    </form>
+      </Stack>
+    </Stack>
   );
 }

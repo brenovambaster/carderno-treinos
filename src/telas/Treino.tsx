@@ -1,6 +1,32 @@
+import { keyframes } from '@emotion/react';
+import CheckRounded from '@mui/icons-material/CheckRounded';
+import DirectionsRunRounded from '@mui/icons-material/DirectionsRunRounded';
+import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
+import HistoryRounded from '@mui/icons-material/HistoryRounded';
+import LightbulbOutlined from '@mui/icons-material/LightbulbOutlined';
+import TrendingUpRounded from '@mui/icons-material/TrendingUpRounded';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import Alert from '@mui/material/Alert';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardHeader from '@mui/material/CardHeader';
+import Chip from '@mui/material/Chip';
+import InputAdornment from '@mui/material/InputAdornment';
+import LinearProgress from '@mui/material/LinearProgress';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import Typography from '@mui/material/Typography';
 import { useEffect, useMemo, useState } from 'react';
+import { Secao } from '../componentes/Pagina';
 import { useApp } from '../contexto';
-import { CHECK } from '../componentes/Moldura';
 import { chaveSerie, enfileirar, gravarCache, lerCache, pendentes, type ItemFila } from '../dados/armazem';
 import { listaDoDia, montarDia, type Dia } from '../dados/dia';
 import { ddmm, hojeISO } from '../lib/datas';
@@ -8,8 +34,41 @@ import { fmt, LIMITE_CARGA, LIMITE_REPS, num, textoDescanso } from '../lib/forma
 import { atualizarResumo, proximoTreino, serieRegistrada, sessoesNaSemana, treinoAoAbrir } from '../lib/sequencia';
 import { sugerir, type Sugestao } from '../lib/sugestao';
 import type { Cardio, ExercicioDoTreino, Serie, UltimaVez } from '../lib/tipos';
+import { FONTE_DISPLAY, NUMEROS } from '../tema';
 
-const campo = (n: number | null) => (n == null ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 2, useGrouping: false }));
+const tremer = keyframes`25% { transform: translateX(-4px); } 75% { transform: translateX(4px); }`;
+
+/** Campo grande de número, para digitar entre as séries. */
+const campoNumero = (unidade: string, id: string, rotulo: string, inputMode: 'decimal' | 'numeric') => ({
+  slotProps: {
+    htmlInput: {
+      id,
+      inputMode,
+      'aria-label': rotulo,
+      autoComplete: 'off',
+      style: {
+        textAlign: 'center' as const,
+        fontFamily: FONTE_DISPLAY,
+        fontSize: 24,
+        fontWeight: 600,
+        padding: '10px 4px',
+        ...NUMEROS,
+      },
+    },
+    input: {
+      endAdornment: (
+        <InputAdornment position="end" sx={{ ml: -1 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {unidade}
+          </Typography>
+        </InputAdornment>
+      ),
+    },
+  },
+});
+
+const campo = (n: number | null) =>
+  n == null ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 2, useGrouping: false });
 const inteiro = (v: string, max: number) => {
   const n = num(v, max);
   return n == null ? null : Math.round(n);
@@ -18,9 +77,9 @@ const inteiro = (v: string, max: number) => {
 function Dica({ ex, sg }: { ex: ExercicioDoTreino; sg: Sugestao }) {
   if (sg.tipo === 'primeira') {
     return (
-      <div className="hint first">
+      <Alert severity="info" icon={<LightbulbOutlined />}>
         Primeira vez: escolha uma carga em que você faça <strong>{ex.repsMin} reps</strong> com 1–2 sobrando.
-      </div>
+      </Alert>
     );
   }
   const ls = sg.ultima.series;
@@ -35,29 +94,35 @@ function Dica({ ex, sg }: { ex: ExercicioDoTreino; sg: Sugestao }) {
   );
   if (sg.tipo === 'subir') {
     return (
-      <div className="hint up">
+      <Alert severity="success" icon={<TrendingUpRounded />}>
         {ultima}
         <br />
-        Todas as séries bateram {ex.repsMax}. <strong>Suba a carga: tente {fmt(sg.carga)} kg</strong> (ou o peso mais próximo
-        disponível).
-      </div>
+        Todas as séries bateram {ex.repsMax}. <strong>Suba a carga: tente {fmt(sg.carga)} kg</strong> (ou o peso mais
+        próximo disponível).
+      </Alert>
     );
   }
   if (sg.tipo === 'subir-corpo') {
     return (
-      <div className="hint up">
+      <Alert severity="success" icon={<TrendingUpRounded />}>
         {ultima}
         <br />
-        Todas as séries bateram {ex.repsMax}. <strong>Dificulte:</strong> coloque peso extra ou diminua a ajuda do graviton.
-      </div>
+        Todas as séries bateram {ex.repsMax}. <strong>Dificulte:</strong> coloque peso extra ou diminua a ajuda do
+        graviton.
+      </Alert>
     );
   }
   return (
-    <div className="hint">
+    <Alert
+      severity="info"
+      variant="outlined"
+      icon={<HistoryRounded />}
+      sx={{ color: 'text.secondary', borderColor: 'divider' }}
+    >
       {ultima}
       <br />
       Mantenha a carga e tente fazer mais repetições.
-    </div>
+    </Alert>
   );
 }
 
@@ -221,63 +286,98 @@ export function TelaTreino() {
   const textoCardio = textos.cardio ?? (cardio?.cardioMin != null ? String(cardio.cardioMin) : '');
 
   return (
-    <div className="stack">
-      <div className="chips" role="group" aria-label="Escolha o treino">
+    <Stack spacing={2}>
+      <Tabs
+        value={treino.id}
+        onChange={(_, id: string) => {
+          setTreinoId(id);
+          window.scrollTo(0, 0);
+        }}
+        variant="scrollable"
+        scrollButtons={false}
+        aria-label="Escolha o treino"
+        sx={{
+          mx: -2,
+          px: 1,
+          borderBottom: 1,
+          borderColor: 'divider',
+          '& .MuiTab-root': { minWidth: 72, px: 1.5, py: 1 },
+        }}
+      >
         {treinos.map((t) => {
           const tem = pronto && Object.values(dia.series).some((s) => s.treinoId === t.id && serieRegistrada(s));
+          const ehProximo = t.id === proximo.id;
           return (
-            <button
+            <Tab
               key={t.id}
-              type="button"
-              className={`chip${tem ? ' has' : ''}${t.id === proximo.id ? ' next' : ''}`}
-              aria-pressed={t.id === treino.id}
-              aria-label={`${t.nome}${t.id === proximo.id ? ' (próximo treino)' : ''}`}
-              onClick={() => {
-                setTreinoId(t.id);
-                window.scrollTo(0, 0);
-              }}
-            >
-              <b>{t.ordem}</b>
-              <small>{t.apelido}</small>
-            </button>
+              value={t.id}
+              aria-label={`${t.nome}${ehProximo ? ' (próximo treino)' : ''}`}
+              label={
+                <Stack sx={{ alignItems: 'center' }}>
+                  <Typography sx={{ fontFamily: FONTE_DISPLAY, fontWeight: 700, fontSize: 22, lineHeight: 1 }}>
+                    {t.ordem}
+                  </Typography>
+                  <Typography variant="caption" noWrap sx={{ maxWidth: 80, textTransform: 'none' }}>
+                    {t.apelido}
+                  </Typography>
+                  <Box
+                    sx={{
+                      mt: 0.5,
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: tem ? 'success.main' : ehProximo ? 'primary.main' : 'transparent',
+                    }}
+                  />
+                </Stack>
+              }
+            />
           );
         })}
-      </div>
+      </Tabs>
 
-      <div className="dayhead">
-        <div>
-          <h1>{treino.nome}</h1>
-          <p className="sub">
-            {treino.foco ? `${treino.foco} · ` : ''}
-            {treino.ordem}º da sequência
-            {treino.id === proximo.id && <span className="tag">próximo</span>}
-          </p>
-        </div>
-        <div className="meta-row">
-          <label className="date" htmlFor="data">
-            Data
-            <input
-              type="date"
-              id="data"
-              value={data}
-              max={hoje}
-              onChange={(e) => e.target.value && setData(e.target.value)}
-            />
-          </label>
-          <span className="count">
-            <b>
-              {feitas}/{todas.length}
-            </b>{' '}
+      <Box>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Typography variant="h1">{treino.nome}</Typography>
+          {treino.id === proximo.id && <Chip size="small" color="primary" label="próximo" />}
+        </Stack>
+        <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>
+          {treino.foco ? `${treino.foco} · ` : ''}
+          {treino.ordem}º da sequência
+        </Typography>
+      </Box>
+
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+        <TextField
+          type="date"
+          label="Data"
+          value={data}
+          sx={{ maxWidth: 170 }}
+          slotProps={{ htmlInput: { max: hoje }, inputLabel: { shrink: true } }}
+          onChange={(e) => e.target.value && setData(e.target.value)}
+        />
+        <Box sx={{ textAlign: 'right' }}>
+          <Typography sx={{ fontFamily: FONTE_DISPLAY, fontWeight: 700, fontSize: 26, lineHeight: 1, ...NUMEROS }}>
+            {feitas}/{todas.length}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             séries · semana: {semana} de {perfil.metaSemanal}
-          </span>
-        </div>
-        <div className="bar" aria-hidden="true">
-          <i style={{ width: `${todas.length ? Math.round((feitas / todas.length) * 100) : 0}%` }} />
-        </div>
-      </div>
+          </Typography>
+        </Box>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        color="success"
+        value={todas.length ? (feitas / todas.length) * 100 : 0}
+        sx={{ height: 8, borderRadius: 4, bgcolor: 'action.hover' }}
+        aria-label="Séries feitas"
+      />
 
       {!pronto ? (
-        <p className="empty">Carregando…</p>
+        <Stack spacing={2}>
+          <Skeleton variant="rounded" height={260} />
+          <Skeleton variant="rounded" height={260} />
+        </Stack>
       ) : (
         <>
           {treino.exercicios.map((ex, idx) => {
@@ -285,117 +385,157 @@ export function TelaTreino() {
             const series = seriesDe(ex);
             const completo = series.every((s) => s.feita);
             return (
-              <article key={ex.id} className={`ex${completo ? ' complete' : ''}`} id={`ex-${ex.id}`}>
-                <div className="ex-h">
-                  <span className="n">{idx + 1}</span>
-                  <div>
-                    <h2>{ex.nome}</h2>
-                    <p>
-                      {ex.series} séries · {ex.repsMin === ex.repsMax ? ex.repsMin : `${ex.repsMin}–${ex.repsMax}`} reps · descanso{' '}
-                      {textoDescanso(ex.descansoSeg)}
-                    </p>
-                  </div>
-                </div>
-                <Dica ex={ex} sg={sg} />
-                <div className="sets">
+              <Card
+                key={ex.id}
+                id={`ex-${ex.id}`}
+                sx={{ borderColor: completo ? 'success.main' : 'divider', transition: 'border-color .2s' }}
+              >
+                <CardHeader
+                  avatar={
+                    <Avatar
+                      sx={{
+                        bgcolor: completo ? 'success.main' : 'action.selected',
+                        color: completo ? 'success.contrastText' : 'text.primary',
+                        fontFamily: FONTE_DISPLAY,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {completo ? <CheckRounded /> : idx + 1}
+                    </Avatar>
+                  }
+                  title={ex.nome}
+                  subheader={`${ex.series} séries · ${ex.repsMin === ex.repsMax ? ex.repsMin : `${ex.repsMin}–${ex.repsMax}`} reps · descanso ${textoDescanso(ex.descansoSeg)}`}
+                  slotProps={{ title: { variant: 'h5', component: 'h2' } }}
+                />
+                <CardContent
+                  sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 1 } }}
+                >
+                  <Dica ex={ex} sg={sg} />
                   {series.map((s, i) => {
                     const idKg = `kg-${ex.id}-${i}`;
                     const idRp = `rp-${ex.id}-${i}`;
                     const noTopo = s.reps != null && s.reps >= ex.repsMax;
+                    const treme = tremendo === `${ex.id}-${i}`;
                     return (
-                      <div key={i} className={`set${tremendo === `${ex.id}-${i}` ? ' shake' : ''}`}>
-                        <span className="sn">{i + 1}</span>
-                        <label className="fld">
-                          <input
-                            className="n"
-                            id={idKg}
-                            inputMode="decimal"
-                            autoComplete="off"
-                            aria-label={`Série ${i + 1}, carga em kg`}
-                            placeholder={phCarga(ex, series, i, sg)}
-                            value={textos[idKg] ?? campo(s.carga)}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setTextos((t) => ({ ...t, [idKg]: v }));
-                              alterar(ex, i, { carga: num(v, LIMITE_CARGA) });
-                            }}
-                          />
-                          <small>kg</small>
-                        </label>
-                        <label className="fld">
-                          <input
-                            className={`n${noTopo ? ' top' : ''}`}
-                            id={idRp}
-                            inputMode="numeric"
-                            autoComplete="off"
-                            aria-label={`Série ${i + 1}, repetições`}
-                            placeholder={phReps(ex, i, sg)}
-                            value={textos[idRp] ?? (s.reps == null ? '' : String(s.reps))}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setTextos((t) => ({ ...t, [idRp]: v }));
-                              alterar(ex, i, { reps: inteiro(v, LIMITE_REPS) });
-                            }}
-                          />
-                          <small>reps</small>
-                        </label>
-                        <button
-                          type="button"
-                          className="done"
-                          aria-pressed={s.feita}
-                          aria-label={`Marcar série ${i + 1} como feita`}
-                          onClick={() => marcar(ex, i)}
+                      <Stack key={i} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Typography
+                          sx={{
+                            width: 18,
+                            textAlign: 'center',
+                            fontFamily: FONTE_DISPLAY,
+                            fontWeight: 600,
+                            color: 'text.secondary',
+                          }}
                         >
-                          {CHECK}
-                        </button>
-                      </div>
+                          {i + 1}
+                        </Typography>
+                        <TextField
+                          {...campoNumero('kg', idKg, `Série ${i + 1}, carga em kg`, 'decimal')}
+                          placeholder={phCarga(ex, series, i, sg)}
+                          value={textos[idKg] ?? campo(s.carga)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setTextos((t) => ({ ...t, [idKg]: v }));
+                            alterar(ex, i, { carga: num(v, LIMITE_CARGA) });
+                          }}
+                        />
+                        <TextField
+                          {...campoNumero('reps', idRp, `Série ${i + 1}, repetições`, 'numeric')}
+                          error={treme}
+                          color={noTopo ? 'success' : 'primary'}
+                          focused={noTopo || undefined}
+                          sx={{ animation: treme ? `${tremer} .3s` : undefined }}
+                          placeholder={phReps(ex, i, sg)}
+                          value={textos[idRp] ?? (s.reps == null ? '' : String(s.reps))}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setTextos((t) => ({ ...t, [idRp]: v }));
+                            alterar(ex, i, { reps: inteiro(v, LIMITE_REPS) });
+                          }}
+                        />
+                        <ToggleButton
+                          value="feita"
+                          selected={s.feita}
+                          aria-label={`Marcar série ${i + 1} como feita`}
+                          onChange={() => marcar(ex, i)}
+                          sx={{
+                            flexShrink: 0,
+                            width: 52,
+                            height: 52,
+                            borderRadius: '12px',
+                            '&.Mui-selected, &.Mui-selected:hover': {
+                              bgcolor: 'success.main',
+                              color: 'success.contrastText',
+                            },
+                          }}
+                        >
+                          <CheckRounded />
+                        </ToggleButton>
+                      </Stack>
                     );
                   })}
-                </div>
-                {ex.dica && (
-                  <details>
-                    <summary>Como fazer</summary>
-                    <p>{ex.dica}</p>
-                  </details>
-                )}
-              </article>
+                  {ex.dica && (
+                    <Accordion
+                      disableGutters
+                      elevation={0}
+                      sx={{ bgcolor: 'transparent', '&::before': { display: 'none' } }}
+                    >
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreRounded />}
+                        sx={{
+                          px: 0,
+                          minHeight: 36,
+                          color: 'primary.main',
+                          fontWeight: 600,
+                          '& .MuiAccordionSummary-content': { my: 0.5 },
+                        }}
+                      >
+                        Como fazer
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ px: 0, pt: 0 }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          {ex.dica}
+                        </Typography>
+                      </AccordionDetails>
+                    </Accordion>
+                  )}
+                </CardContent>
+              </Card>
             );
           })}
 
-          <div className="card">
-            <h2>Cardio</h2>
-            <p className="muted small">
-              {treino.cardio ? `${treino.cardio}. ` : ''}Esteira com 8–12% de inclinação, num ritmo em que dá para conversar com
-              esforço.
-            </p>
-            <label className="lbl" htmlFor="cardio">
-              Minutos feitos
-              <input
-                className="n"
-                id="cardio"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="20"
-                value={textoCardio}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setTextos((t) => ({ ...t, cardio: v }));
-                  gravar([], {
-                    data,
-                    treinoId: treino.id,
-                    cardioMin: inteiro(v, 600),
-                    alteradoEm: new Date().toISOString(),
-                  });
-                }}
-              />
-            </label>
-          </div>
-          <p className="note">
+          <Secao
+            titulo="Cardio"
+            subtitulo={`${treino.cardio ? `${treino.cardio}. ` : ''}Esteira com 8–12% de inclinação, num ritmo em que dá para conversar com esforço.`}
+            acao={<DirectionsRunRounded sx={{ color: 'text.secondary' }} />}
+          >
+            <TextField
+              label="Minutos feitos"
+              placeholder="20"
+              value={textoCardio}
+              sx={{ maxWidth: 200 }}
+              slotProps={{
+                htmlInput: { id: 'cardio', inputMode: 'numeric', autoComplete: 'off' },
+                input: { endAdornment: <InputAdornment position="end">min</InputAdornment> },
+              }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTextos((t) => ({ ...t, cardio: v }));
+                gravar([], {
+                  data,
+                  treinoId: treino.id,
+                  cardioMin: inteiro(v, 600),
+                  alteradoEm: new Date().toISOString(),
+                });
+              }}
+            />
+          </Secao>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Tudo é salvo sozinho enquanto você digita, mesmo sem sinal: o que não subir fica guardado no aparelho e é
             enviado quando a conexão voltar. Ao marcar uma série, o descanso começa a contar.
-          </p>
+          </Typography>
         </>
       )}
-    </div>
+    </Stack>
   );
 }

@@ -1,7 +1,29 @@
 // Catálogo de exercícios: admin e personal cadastram; só o admin corrige ou apaga.
-import { useEffect, useMemo, useState } from 'react';
+import AddRounded from '@mui/icons-material/AddRounded';
+import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
+import EditRounded from '@mui/icons-material/EditRounded';
+import SearchRounded from '@mui/icons-material/SearchRounded';
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Snackbar from '@mui/material/Snackbar';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { DialogoExercicio } from '../componentes/FormExercicio';
+import { Cabecalho, Secao, Vazio } from '../componentes/Pagina';
 import { useApp } from '../contexto';
-import { FormExercicio } from '../componentes/FormExercicio';
 import { normalizar, textoIncremento } from '../lib/formato';
 import type { Exercicio } from '../lib/tipos';
 import { href } from '../rotas';
@@ -13,9 +35,9 @@ export function TelaCatalogo() {
   const ehAdmin = acesso.papel === 'admin';
   const [grupo, setGrupo] = useState('');
   const [busca, setBusca] = useState('');
-  const [editando, setEditando] = useState<string | null>(null); // id ou 'novo'
-  const [apagando, setApagando] = useState<string | null>(null);
-  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [editando, setEditando] = useState<Exercicio | 'novo' | null>(null);
+  const [apagando, setApagando] = useState<Exercicio | null>(null);
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
 
   // Pega o que outros cadastraram desde que o app abriu.
   useEffect(() => {
@@ -38,115 +60,151 @@ export function TelaCatalogo() {
   );
 
   async function apagar(e: Exercicio) {
-    if (apagando !== e.id) {
-      setApagando(e.id);
-      return;
-    }
     setApagando(null);
     try {
       await servidor.apagarExercicio(e.id);
       alterarCatalogo({ ...catalogo, exercicios: catalogo.exercicios.filter((x) => x.id !== e.id) });
-      setMsg({ ok: true, texto: `${e.nome} saiu do catálogo.` });
+      setAviso({ ok: true, texto: `${e.nome} saiu do catálogo.` });
     } catch (err) {
-      setMsg({ ok: false, texto: (err as Error).message || 'Não consegui apagar.' });
+      setAviso({ ok: false, texto: (err as Error).message || 'Não consegui apagar.' });
     }
   }
 
   return (
-    <div className="stack">
-      <a className="voltar" href={href({ v: 'usuarios' })}>
-        ← {ehAdmin ? 'Usuários' : 'Alunos'}
-      </a>
-      <h1 className="titulo">Catálogo</h1>
-      <p className="muted small">
-        Os exercícios que podem entrar nas fichas.{' '}
-        {ehAdmin ? 'Só você corrige ou apaga; personais também cadastram.' : 'Só o admin corrige ou apaga.'}
-      </p>
-      {!online && <p className="aviso small">Sem conexão: mudar o catálogo precisa de internet.</p>}
+    <>
+      <Cabecalho
+        titulo="Catálogo"
+        voltar={{ href: href({ v: 'usuarios' }), rotulo: ehAdmin ? 'Usuários' : 'Alunos' }}
+        subtitulo={`${catalogo.exercicios.length} exercícios que podem entrar nas fichas. ${
+          ehAdmin ? 'Só você corrige ou apaga; personais também cadastram.' : 'Só o admin corrige ou apaga.'
+        }`}
+        acao={
+          <Button variant="contained" startIcon={<AddRounded />} onClick={() => setEditando('novo')} disabled={!online}>
+            Novo
+          </Button>
+        }
+      />
+      {!online && <Alert severity="warning">Sem conexão: mudar o catálogo precisa de internet.</Alert>}
 
-      {editando === 'novo' ? (
-        <FormExercicio
-          grupos={catalogo.grupos}
-          grupoInicial={grupo || undefined}
-          rotulo="Cadastrar"
-          aoCancelar={() => setEditando(null)}
-          aoSalvar={async (dados) => {
+      <TextField
+        placeholder="Buscar pelo nome"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchRounded />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
+      <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 0.5, mx: -2, px: 2 }}>
+        <Chip label="Todos" color={grupo ? 'default' : 'primary'} onClick={() => setGrupo('')} />
+        {catalogo.grupos.map((g) => (
+          <Chip
+            key={g.id}
+            label={g.nome}
+            color={grupo === g.id ? 'primary' : 'default'}
+            variant={grupo === g.id ? 'filled' : 'outlined'}
+            onClick={() => setGrupo(grupo === g.id ? '' : g.id)}
+          />
+        ))}
+      </Stack>
+
+      {porGrupo.length === 0 && <Vazio>Nenhum exercício encontrado.</Vazio>}
+      {porGrupo.map(({ grupo: g, exercicios }) => (
+        <Secao key={g.id} titulo={g.nome} acao={<Chip size="small" label={exercicios.length} />}>
+          <List disablePadding>
+            {exercicios.map((e, i) => (
+              <Fragment key={e.id}>
+                {i > 0 && <Divider component="li" />}
+                <ListItem
+                  disableGutters
+                  secondaryAction={
+                    ehAdmin && (
+                      <Stack direction="row">
+                        <IconButton aria-label={`Editar ${e.nome}`} onClick={() => setEditando(e)} disabled={!online}>
+                          <EditRounded fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          edge="end"
+                          color="error"
+                          aria-label={`Apagar ${e.nome}`}
+                          onClick={() => setApagando(e)}
+                          disabled={!online}
+                        >
+                          <DeleteOutlineRounded fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    )
+                  }
+                >
+                  <ListItemText
+                    primary={e.nome}
+                    secondary={textoIncremento(e.incremento)}
+                    sx={{ pr: ehAdmin ? 10 : 0 }}
+                    slotProps={{ primary: { sx: { fontWeight: 600 } } }}
+                  />
+                </ListItem>
+              </Fragment>
+            ))}
+          </List>
+        </Secao>
+      ))}
+
+      <DialogoExercicio
+        aberto={editando !== null}
+        titulo={editando === 'novo' ? 'Cadastrar exercício' : 'Corrigir exercício'}
+        grupos={catalogo.grupos}
+        inicial={editando && editando !== 'novo' ? editando : undefined}
+        grupoInicial={grupo || undefined}
+        rotulo={editando === 'novo' ? 'Cadastrar' : 'Salvar'}
+        aoFechar={() => setEditando(null)}
+        aoSalvar={async (dados) => {
+          if (editando === 'novo') {
             const novo = await servidor.cadastrarExercicio(dados);
             alterarCatalogo({ ...catalogo, exercicios: [...catalogo.exercicios, novo].sort(porNome) });
-            setEditando(null);
-            setMsg({ ok: true, texto: `${novo.nome} entrou no catálogo.` });
-          }}
-        />
-      ) : (
-        <button type="button" className="btn" onClick={() => setEditando('novo')}>
-          Cadastrar exercício
-        </button>
-      )}
+            setAviso({ ok: true, texto: `${novo.nome} entrou no catálogo.` });
+          } else if (editando) {
+            const novo = { ...dados, id: editando.id };
+            await servidor.alterarExercicio(novo);
+            alterarCatalogo({
+              ...catalogo,
+              exercicios: catalogo.exercicios.map((x) => (x.id === novo.id ? novo : x)).sort(porNome),
+            });
+            setAviso({ ok: true, texto: 'Exercício corrigido.' });
+          }
+          setEditando(null);
+        }}
+      />
 
-      <div className="row2">
-        <label className="lbl">
-          Grupo
-          <select value={grupo} onChange={(e) => setGrupo(e.target.value)}>
-            <option value="">Todos</option>
-            {catalogo.grupos.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="lbl">
-          Buscar
-          <input value={busca} placeholder="nome" onChange={(e) => setBusca(e.target.value)} />
-        </label>
-      </div>
-      {msg && <p className={`small ${msg.ok ? 'ok' : 'erro'}`}>{msg.texto}</p>}
+      <Dialog open={apagando !== null} onClose={() => setApagando(null)}>
+        <DialogTitle>Apagar {apagando?.nome}?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.secondary' }}>
+            Só dá para apagar um exercício que não está em nenhuma ficha nem no histórico de ninguém.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApagando(null)}>Cancelar</Button>
+          <Button color="error" variant="contained" onClick={() => apagando && void apagar(apagando)}>
+            Apagar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      {porGrupo.length === 0 && <p className="empty">Nenhum exercício encontrado.</p>}
-      {porGrupo.map(({ grupo: g, exercicios }) => (
-        <div className="card" key={g.id}>
-          <h2>{g.nome}</h2>
-          <div className="list">
-            {exercicios.map((e) =>
-              editando === e.id ? (
-                <FormExercicio
-                  key={e.id}
-                  grupos={catalogo.grupos}
-                  inicial={e}
-                  rotulo="Salvar"
-                  aoCancelar={() => setEditando(null)}
-                  aoSalvar={async (dados) => {
-                    const novo = { ...dados, id: e.id };
-                    await servidor.alterarExercicio(novo);
-                    alterarCatalogo({
-                      ...catalogo,
-                      exercicios: catalogo.exercicios.map((x) => (x.id === e.id ? novo : x)).sort(porNome),
-                    });
-                    setEditando(null);
-                  }}
-                />
-              ) : (
-                <div className="li" key={e.id}>
-                  <div>
-                    <div className="t">{e.nome}</div>
-                    <div className="s">{textoIncremento(e.incremento)}</div>
-                  </div>
-                  {ehAdmin && (
-                    <div className="btn-row">
-                      <button type="button" className="btn ghost small" onClick={() => setEditando(e.id)}>
-                        Editar
-                      </button>
-                      <button type="button" className="btn danger small" onClick={() => void apagar(e)}>
-                        {apagando === e.id ? 'Apagar mesmo' : 'Apagar'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+      <Snackbar
+        open={aviso !== null}
+        autoHideDuration={aviso?.ok ? 3000 : 6000}
+        onClose={() => setAviso(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity={aviso?.ok ? 'success' : 'error'} variant="filled" onClose={() => setAviso(null)}>
+          {aviso?.texto}
+        </Alert>
+      </Snackbar>
+    </>
   );
 }

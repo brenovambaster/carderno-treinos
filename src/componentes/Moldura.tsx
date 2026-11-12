@@ -1,88 +1,136 @@
-import type { ReactNode } from 'react';
+// Barra do topo (marca e situação da sincronização) e navegação de baixo, por papel.
+import CloudDoneRounded from '@mui/icons-material/CloudDoneRounded';
+import CloudOffRounded from '@mui/icons-material/CloudOffRounded';
+import CloudSyncRounded from '@mui/icons-material/CloudSyncRounded';
+import CloudUploadRounded from '@mui/icons-material/CloudUploadRounded';
+import ErrorOutlineRounded from '@mui/icons-material/ErrorOutlineRounded';
+import FitnessCenterRounded from '@mui/icons-material/FitnessCenterRounded';
+import GroupsRounded from '@mui/icons-material/GroupsRounded';
+import InsightsRounded from '@mui/icons-material/InsightsRounded';
+import PersonRounded from '@mui/icons-material/PersonRounded';
+import StraightenRounded from '@mui/icons-material/StraightenRounded';
+import AppBar from '@mui/material/AppBar';
+import BottomNavigation from '@mui/material/BottomNavigation';
+import BottomNavigationAction from '@mui/material/BottomNavigationAction';
+import Chip from '@mui/material/Chip';
+import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import type { ReactElement } from 'react';
 import type { EstadoSync } from '../dados/sincronizador';
 import type { Papel } from '../lib/tipos';
+import { FONTE_DISPLAY } from '../tema';
 
 export type Aba = 'treino' | 'evolucao' | 'medidas' | 'plano' | 'usuarios';
 
-function status(e: EstadoSync, online: boolean): [string, string] {
-  if (e.estado === 'salvando') return ['saving', 'Salvando…'];
-  if (e.estado === 'erro') return ['error', 'Erro ao salvar'];
-  if (e.pendentes > 0) return ['local', `${e.pendentes} pendente${e.pendentes > 1 ? 's' : ''}`];
-  if (!online) return ['local', 'Sem conexão'];
-  return ['saved', 'Salvo'];
+/** Altura da navegação de baixo, para o cronômetro e as barras fixas ficarem acima dela. */
+export const ALTURA_ABAS = 56;
+
+type Situacao = { texto: string; cor: 'success' | 'primary' | 'warning' | 'error' | 'default'; icone: ReactElement };
+
+function situacao(e: EstadoSync | undefined, online: boolean): Situacao | null {
+  if (!e) return online ? null : { texto: 'Sem conexão', cor: 'warning', icone: <CloudOffRounded /> };
+  if (e.estado === 'salvando') return { texto: 'Salvando…', cor: 'primary', icone: <CloudSyncRounded /> };
+  if (e.estado === 'erro') return { texto: 'Erro ao salvar', cor: 'error', icone: <ErrorOutlineRounded /> };
+  if (e.pendentes > 0)
+    return {
+      texto: `${e.pendentes} pendente${e.pendentes > 1 ? 's' : ''}`,
+      cor: 'warning',
+      icone: <CloudUploadRounded />,
+    };
+  if (!online) return { texto: 'Sem conexão', cor: 'warning', icone: <CloudOffRounded /> };
+  return { texto: 'Salvo', cor: 'success', icone: <CloudDoneRounded /> };
 }
 
 export function Topo({ estado, online }: { estado?: EstadoSync; online: boolean }) {
-  const [s, texto] = estado ? status(estado, online) : online ? ['loading', ''] : ['local', 'Sem conexão'];
+  const s = situacao(estado, online);
   return (
-    <header className="top">
-      <div className="wrap">
-        <span className="brand">Caderno de treino</span>
-        <span className="status" data-s={s} title={estado?.mensagem}>
-          {texto}
-        </span>
-      </div>
-    </header>
+    <AppBar
+      position="sticky"
+      color="inherit"
+      elevation={0}
+      sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', pt: 'env(safe-area-inset-top)' }}
+    >
+      <Container maxWidth="sm" disableGutters>
+        <Toolbar sx={{ minHeight: { xs: 52 }, px: 2, gap: 1 }}>
+          <FitnessCenterRounded sx={{ color: 'primary.main' }} />
+          <Typography
+            sx={{
+              flex: 1,
+              fontFamily: FONTE_DISPLAY,
+              fontWeight: 700,
+              fontSize: 18,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+            noWrap
+          >
+            Caderno de treino
+          </Typography>
+          {s && (
+            <Chip
+              size="small"
+              variant="outlined"
+              color={s.cor}
+              icon={s.icone}
+              label={s.texto}
+              title={estado?.mensagem}
+              role="status"
+            />
+          )}
+        </Toolbar>
+      </Container>
+    </AppBar>
   );
 }
 
-const ABAS: { v: Aba; rotulo: string; icone: ReactNode }[] = [
-  { v: 'treino', rotulo: 'Treino', icone: <path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12" /> },
-  { v: 'evolucao', rotulo: 'Evolução', icone: <path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6" /> },
-  {
-    v: 'medidas',
-    rotulo: 'Medidas',
-    icone: (
-      <>
-        <rect x="3" y="8" width="18" height="8" rx="2" />
-        <path d="M7 8v3M11 8v4M15 8v3M19 8v2" />
-      </>
-    ),
-  },
-  {
-    v: 'plano',
-    rotulo: 'Plano',
-    icone: (
-      <>
-        <circle cx="12" cy="12" r="8" />
-        <circle cx="12" cy="12" r="4" />
-        <circle cx="12" cy="12" r="1" />
-      </>
-    ),
-  },
+const ABAS: { v: Aba; rotulo: string; icone: ReactElement }[] = [
+  { v: 'treino', rotulo: 'Treino', icone: <FitnessCenterRounded /> },
+  { v: 'evolucao', rotulo: 'Evolução', icone: <InsightsRounded /> },
+  { v: 'medidas', rotulo: 'Medidas', icone: <StraightenRounded /> },
+  { v: 'plano', rotulo: 'Perfil', icone: <PersonRounded /> },
 ];
 
-const ABA_USUARIOS = (papel: Papel) => ({
-  v: 'usuarios' as const,
-  rotulo: papel === 'admin' ? 'Usuários' : 'Alunos',
-  icone: (
-    <>
-      <circle cx="9" cy="8" r="3.2" />
-      <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
-      <circle cx="17" cy="9" r="2.4" />
-      <path d="M16 14c2.8 0 5 1.8 5 4.6" />
-    </>
-  ),
-});
-
 export function Abas({ atual, papel }: { atual: Aba; papel: Papel }) {
-  const abas = papel === 'aluno' ? ABAS : [...ABAS, ABA_USUARIOS(papel)];
+  const abas =
+    papel === 'aluno'
+      ? ABAS
+      : [
+          ...ABAS,
+          { v: 'usuarios' as const, rotulo: papel === 'admin' ? 'Usuários' : 'Alunos', icone: <GroupsRounded /> },
+        ];
   return (
-    <nav className="tabs" aria-label="Seções">
-      <div className="wrap" style={{ gridTemplateColumns: `repeat(${abas.length}, 1fr)` }}>
-        {abas.map((a) => (
-          <a key={a.v} href={`#${a.v}`} aria-current={a.v === atual ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24">{a.icone}</svg>
-            {a.rotulo}
-          </a>
-        ))}
-      </div>
-    </nav>
+    <Paper
+      component="nav"
+      aria-label="Seções"
+      square
+      elevation={0}
+      sx={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: (t) => t.zIndex.appBar,
+        borderTop: 1,
+        borderColor: 'divider',
+        pb: 'env(safe-area-inset-bottom)',
+      }}
+    >
+      <Container maxWidth="sm" disableGutters>
+        <BottomNavigation
+          showLabels
+          value={atual}
+          sx={{ height: ALTURA_ABAS, bgcolor: 'transparent' }}
+          onChange={(_, v: Aba) => {
+            location.hash = v;
+          }}
+        >
+          {abas.map((a) => (
+            <BottomNavigationAction key={a.v} value={a.v} label={a.rotulo} icon={a.icone} />
+          ))}
+        </BottomNavigation>
+      </Container>
+    </Paper>
   );
 }
-
-export const CHECK = (
-  <svg viewBox="0 0 24 24" fill="none" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12.5l4.5 4.5L19 7.5" />
-  </svg>
-);

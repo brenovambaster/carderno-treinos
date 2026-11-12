@@ -1,7 +1,10 @@
 // As três telas que editam uma Ficha de treino: a própria, a de um usuário e a Ficha padrão.
+import Alert from '@mui/material/Alert';
+import Skeleton from '@mui/material/Skeleton';
 import { useCallback, useEffect, useState } from 'react';
-import { useApp } from '../contexto';
 import { EditorFicha, type FonteCopia } from '../componentes/EditorFicha';
+import { Cabecalho } from '../componentes/Pagina';
+import { useApp } from '../contexto';
 import type { Exercicio, Ficha, UsuarioPainel } from '../lib/tipos';
 import { href } from '../rotas';
 
@@ -28,16 +31,16 @@ export function TelaMinhaFicha() {
   const { servidor, ficha, catalogo, acesso, recarregarFicha, online } = useApp();
   const cadastrar = useCadastrar();
   return (
-    <div className="stack">
-      <a className="voltar" href={href({ v: 'plano' })}>
-        ← Plano
-      </a>
-      <h1 className="titulo">Sua ficha</h1>
-      <p className="muted small">
-        {ficha.podeEditar
-          ? NOTA_EDICAO
-          : `Quem monta a sua ficha é o seu personal${acesso.personal ? ` (${acesso.personal})` : ''}. Aqui você vê tudo o que está nela.`}
-      </p>
+    <>
+      <Cabecalho
+        titulo="Sua ficha"
+        voltar={{ href: href({ v: 'plano' }), rotulo: 'Perfil' }}
+        subtitulo={
+          ficha.podeEditar
+            ? NOTA_EDICAO
+            : `Quem monta a sua ficha é o seu personal${acesso.personal ? ` (${acesso.personal})` : ''}. Aqui você vê tudo o que está nela.`
+        }
+      />
       <EditorFicha
         ficha={ficha}
         catalogo={catalogo}
@@ -52,7 +55,7 @@ export function TelaMinhaFicha() {
           await recarregarFicha();
         }}
       />
-    </div>
+    </>
   );
 }
 
@@ -67,21 +70,18 @@ export function TelaFichaPadrao() {
   }, [servidor]);
 
   return (
-    <div className="stack">
-      <a className="voltar" href={href({ v: 'usuarios' })}>
-        ← Usuários
-      </a>
-      <h1 className="titulo">Ficha padrão</h1>
-      <p className="muted small">
-        Quem entra no app pela primeira vez recebe uma cópia desta ficha. Mudar aqui não muda a ficha de quem já tem a
-        sua.
-      </p>
+    <>
+      <Cabecalho
+        titulo="Ficha padrão"
+        voltar={{ href: href({ v: 'usuarios' }), rotulo: 'Usuários' }}
+        subtitulo="Quem entra no app pela primeira vez recebe uma cópia desta ficha. Mudar aqui não muda a ficha de quem já tem a sua."
+      />
       {erro ? (
-        <p className="aviso">
+        <Alert severity="warning">
           {online ? `Não consegui abrir a ficha: ${erro}` : 'Sem conexão: a ficha padrão precisa de internet.'}
-        </p>
+        </Alert>
       ) : !ficha ? (
-        <p className="empty">Carregando…</p>
+        <Skeleton variant="rounded" height={320} />
       ) : (
         <EditorFicha
           ficha={ficha}
@@ -96,7 +96,7 @@ export function TelaFichaPadrao() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -147,38 +147,36 @@ export function TelaFichaUsuario({ email }: { email: string }) {
   ];
 
   return (
-    <div className="stack">
-      <a className="voltar" href={href({ v: 'usuario', email })}>
-        ← {nome}
-      </a>
-      <h1 className="titulo">Ficha de {nome.split(' ')[0]}</h1>
+    <>
+      <Cabecalho
+        titulo={`Ficha de ${nome.split(/[ @]/)[0]}`}
+        voltar={{ href: href({ v: 'usuario', email }), rotulo: nome }}
+        subtitulo={ficha ? (ficha.podeEditar ? NOTA_EDICAO : 'Você pode ver esta ficha, mas não alterar.') : undefined}
+      />
       {erro ? (
-        <p className="aviso">
+        <Alert severity="warning">
           {online ? `Não consegui abrir a ficha: ${erro}` : 'Sem conexão: a ficha precisa de internet.'}
-        </p>
+        </Alert>
       ) : alvo === undefined || (alvo?.userId && !ficha) ? (
-        <p className="empty">Carregando…</p>
+        <Skeleton variant="rounded" height={320} />
       ) : !alvo ? (
-        <p className="aviso">Usuário não encontrado.</p>
+        <Alert severity="warning">Usuário não encontrado.</Alert>
       ) : !alvo.userId || !ficha ? (
-        <p className="aviso">{nome} ainda não entrou no app. A ficha aparece depois do primeiro acesso.</p>
+        <Alert severity="info">{nome} ainda não entrou no app. A ficha aparece depois do primeiro acesso.</Alert>
       ) : (
-        <>
-          <p className="muted small">{ficha.podeEditar ? NOTA_EDICAO : 'Você pode ver esta ficha, mas não alterar.'}</p>
-          <EditorFicha
-            ficha={ficha}
-            catalogo={catalogo}
-            podeCadastrar={acesso.papel !== 'aluno'}
-            online={online}
-            fontes={fontes}
-            aoCadastrar={cadastrar}
-            aoSalvar={async (treinos) => {
-              await servidor.salvarFicha(ficha.id, treinos);
-              setFicha(await servidor.ficha(alvo.userId!));
-            }}
-          />
-        </>
+        <EditorFicha
+          ficha={ficha}
+          catalogo={catalogo}
+          podeCadastrar={acesso.papel !== 'aluno'}
+          online={online}
+          fontes={fontes}
+          aoCadastrar={cadastrar}
+          aoSalvar={async (treinos) => {
+            await servidor.salvarFicha(ficha.id, treinos);
+            setFicha(await servidor.ficha(alvo.userId!));
+          }}
+        />
       )}
-    </div>
+    </>
   );
 }

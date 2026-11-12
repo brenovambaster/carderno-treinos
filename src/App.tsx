@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Container from '@mui/material/Container';
+import Stack from '@mui/material/Stack';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { AppCtx, type Catalogo, type Contexto } from './contexto';
 import { Cronometro, useCronometro } from './componentes/Cronometro';
-import { Abas, Topo } from './componentes/Moldura';
+import { ALTURA_ABAS, Abas, Topo } from './componentes/Moldura';
 import { gravarCache, lerCache, pendentes, semTipo } from './dados/armazem';
 import { ehSemRede, type Servidor } from './dados/servidor';
 import { Sincronizador, type EstadoSync } from './dados/sincronizador';
@@ -9,17 +13,22 @@ import { hojeISO } from './lib/datas';
 import { resumosComPendentes } from './lib/sequencia';
 import type { Acesso, Ficha, Medicao, Perfil, ResumoSessao, Serie, Usuario } from './lib/tipos';
 import { abaDe, href, lerRota, permitida, type Rota } from './rotas';
-import { TelaCatalogo } from './telas/Catalogo';
 import { TelaLogin, TelaInativo, TelaPrimeiroAcesso, TelaSemConvite, TelaSemDados } from './telas/Entrada';
 import { TelaEvolucao } from './telas/Evolucao';
-import { TelaFichaPadrao, TelaFichaUsuario, TelaMinhaFicha } from './telas/Fichas';
 import { FormPerfil } from './telas/FormPerfil';
 import { TelaMedidas } from './telas/Medidas';
 import { TelaPlano } from './telas/Plano';
 import { TelaTreino } from './telas/Treino';
-import { TelaUsuario, TelaUsuarios } from './telas/Usuarios';
 
 const ULTIMO_USUARIO = 'caderno-treino:usuario';
+
+// Telas de edição e de admin/personal: carregadas só quando abertas (ficam guardadas para usar sem sinal).
+const TelaCatalogo = lazy(() => import('./telas/Catalogo').then((m) => ({ default: m.TelaCatalogo })));
+const TelaMinhaFicha = lazy(() => import('./telas/Fichas').then((m) => ({ default: m.TelaMinhaFicha })));
+const TelaFichaPadrao = lazy(() => import('./telas/Fichas').then((m) => ({ default: m.TelaFichaPadrao })));
+const TelaFichaUsuario = lazy(() => import('./telas/Fichas').then((m) => ({ default: m.TelaFichaUsuario })));
+const TelaUsuarios = lazy(() => import('./telas/Usuarios').then((m) => ({ default: m.TelaUsuarios })));
+const TelaUsuario = lazy(() => import('./telas/Usuarios').then((m) => ({ default: m.TelaUsuario })));
 
 type Dados = {
   acesso: Acesso;
@@ -225,7 +234,9 @@ export function App({ servidor }: { servidor: Servidor }) {
     return (
       <>
         <Topo online={online} />
-        <div className="carregando">Carregando…</div>
+        <Box sx={{ minHeight: '70dvh', display: 'grid', placeItems: 'center' }} aria-label="Carregando">
+          <CircularProgress />
+        </Box>
       </>
     );
   }
@@ -287,23 +298,35 @@ export function App({ servidor }: { servidor: Servidor }) {
   return (
     <AppCtx.Provider value={ctx}>
       <Topo estado={estadoSync} online={online} />
-      <main>
-        <div className="wrap">
+      <Container
+        component="main"
+        maxWidth="sm"
+        sx={{ pt: 2, pb: `calc(${ALTURA_ABAS + 110}px + env(safe-area-inset-bottom))` }}
+      >
+        <Stack spacing={2} useFlexGap>
           {/* O treino fica montado para não perder o que está sendo digitado ao trocar de aba. */}
-          <div hidden={visivel.v !== 'treino'}>
+          <Box hidden={visivel.v !== 'treino'} sx={{ '&[hidden]': { display: 'none' } }}>
             <TelaTreino />
-          </div>
+          </Box>
           {visivel.v === 'evolucao' && <TelaEvolucao />}
           {visivel.v === 'medidas' && <TelaMedidas />}
           {visivel.v === 'plano' && <TelaPlano />}
-          {visivel.v === 'ficha' && <TelaMinhaFicha />}
-          {visivel.v === 'usuarios' && <TelaUsuarios />}
-          {visivel.v === 'usuario' && <TelaUsuario key={visivel.email} email={visivel.email} />}
-          {visivel.v === 'ficha-usuario' && <TelaFichaUsuario key={visivel.email} email={visivel.email} />}
-          {visivel.v === 'padrao' && <TelaFichaPadrao />}
-          {visivel.v === 'catalogo' && <TelaCatalogo />}
-        </div>
-      </main>
+          <Suspense
+            fallback={
+              <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            }
+          >
+            {visivel.v === 'ficha' && <TelaMinhaFicha />}
+            {visivel.v === 'usuarios' && <TelaUsuarios />}
+            {visivel.v === 'usuario' && <TelaUsuario key={visivel.email} email={visivel.email} />}
+            {visivel.v === 'ficha-usuario' && <TelaFichaUsuario key={visivel.email} email={visivel.email} />}
+            {visivel.v === 'padrao' && <TelaFichaPadrao />}
+            {visivel.v === 'catalogo' && <TelaCatalogo />}
+          </Suspense>
+        </Stack>
+      </Container>
       <Cronometro c={cronometro} />
       <Abas atual={abaDe(visivel)} papel={dados.acesso.papel} />
     </AppCtx.Provider>

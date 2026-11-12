@@ -1,11 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListSubheader from '@mui/material/ListSubheader';
+import MenuItem from '@mui/material/MenuItem';
+import Skeleton from '@mui/material/Skeleton';
+import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useApp, type Catalogo } from '../contexto';
 import { Grafico } from '../componentes/Grafico';
+import { Cabecalho, Secao, Vazio } from '../componentes/Pagina';
 import type { Servidor } from '../dados/servidor';
 import { ddmm, diaDaSemana } from '../lib/datas';
 import { fmt } from '../lib/formato';
 import { sessaoMaisRecente } from '../lib/sequencia';
 import type { Cardio, Ficha, ResumoSessao, Serie } from '../lib/tipos';
+import { FONTE_DISPLAY, NUMEROS } from '../tema';
 
 type Props = {
   servidor: Servidor;
@@ -76,43 +89,53 @@ export function PainelEvolucao({ servidor, uid, ficha, catalogo, resumos, online
   const cardioDe = (data: string, treinoId: string) =>
     cardios.find((c) => c.data === data && c.treinoId === treinoId)?.cardioMin ?? null;
 
+  const opcoes = [
+    ...ficha.treinos.flatMap((t) => [
+      <ListSubheader key={`g-${t.id}`}>{`${t.ordem} · ${t.nome}`}</ListSubheader>,
+      ...t.exercicios.map((x) => (
+        <MenuItem key={`${t.id}-${x.id}`} value={x.id}>
+          {x.nome}
+        </MenuItem>
+      )),
+    ]),
+    ...(foraDaFicha.length
+      ? [
+          <ListSubheader key="fora">Fora da ficha (com histórico)</ListSubheader>,
+          ...foraDaFicha.map((x) => (
+            <MenuItem key={`fora-${x.id}`} value={x.id}>
+              {x.nome}
+            </MenuItem>
+          )),
+        ]
+      : []),
+  ];
+  // O mesmo exercício pode estar em dois treinos: o Select precisa de uma opção só por valor.
+  const vistos = new Set<string>();
+  const opcoesUnicas = opcoes.filter((o) => {
+    if (o.type !== MenuItem) return true;
+    const v = (o.props as { value: string }).value;
+    if (vistos.has(v)) return false;
+    vistos.add(v);
+    return true;
+  });
+
   return (
     <>
-      <div className="card">
-        <label className="lbl" htmlFor={`exsel-${uid}`}>
-          Exercício
-          <select id={`exsel-${uid}`} value={exId} onChange={(e) => setExId(e.target.value)}>
-            {ficha.treinos.map((t) => (
-              <optgroup key={t.id} label={`${t.ordem} · ${t.nome}`}>
-                {t.exercicios.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.nome}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-            {foraDaFicha.length > 0 && (
-              <optgroup label="Fora da ficha (com histórico)">
-                {foraDaFicha.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.nome}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </label>
-        <p className="muted small">
-          {peloCorpo ? 'Maior número de repetições em cada treino.' : 'Maior carga usada em cada treino (kg).'}
-        </p>
+      <Secao
+        titulo="Por exercício"
+        subtitulo={peloCorpo ? 'Maior número de repetições em cada treino.' : 'Maior carga usada em cada treino.'}
+      >
+        <TextField select label="Exercício" value={exId} onChange={(e) => setExId(e.target.value)} sx={{ mb: 1 }}>
+          {opcoesUnicas}
+        </TextField>
         {historico === 'erro' ? (
-          <p className="aviso">
+          <Alert severity="warning">
             {online
               ? 'Não consegui carregar agora. Tente de novo em instantes.'
               : 'Sem conexão: a evolução precisa de internet.'}
-          </p>
+          </Alert>
         ) : historico === null ? (
-          <p className="empty">Carregando…</p>
+          <Skeleton variant="rounded" height={190} />
         ) : (
           <>
             <Grafico
@@ -120,62 +143,68 @@ export function PainelEvolucao({ servidor, uid, ficha, catalogo, resumos, online
                 .slice()
                 .reverse()
                 .map((l) => ({ data: l.data, y: l.y }))}
-              unidade={peloCorpo ? 'repetições' : 'kg'}
+              unidade={peloCorpo ? 'repetições' : 'carga'}
+              sufixo={peloCorpo ? ' reps' : ' kg'}
             />
             {linhas.length ? (
-              <div className="list">
-                {linhas.slice(0, 12).map((l) => (
-                  <div className="li" key={l.data}>
-                    <div>
-                      <div className="t">{ddmm(l.data)}</div>
-                      <div className="s">{diaDaSemana(l.data)}</div>
-                    </div>
-                    <div className="sets-sum">
-                      {l.series.map((s) => (s.carga != null ? `${fmt(s.carga)}×` : '') + s.reps).join(' · ')}
-                    </div>
-                  </div>
+              <List disablePadding>
+                {linhas.slice(0, 12).map((l, i) => (
+                  <Fragment key={l.data}>
+                    {i > 0 && <Divider component="li" />}
+                    <ListItem
+                      disableGutters
+                      secondaryAction={
+                        <Typography sx={{ fontFamily: FONTE_DISPLAY, fontSize: 18, fontWeight: 600, ...NUMEROS }}>
+                          {l.series.map((s) => (s.carga != null ? `${fmt(s.carga)}×` : '') + s.reps).join(' · ')}
+                        </Typography>
+                      }
+                    >
+                      <ListItemText primary={ddmm(l.data)} secondary={diaDaSemana(l.data)} />
+                    </ListItem>
+                  </Fragment>
                 ))}
-              </div>
+              </List>
             ) : (
-              <p className="empty">Ainda não há registros deste exercício.</p>
+              <Vazio>Ainda não há registros deste exercício.</Vazio>
             )}
           </>
         )}
-      </div>
+      </Secao>
 
-      <div className="card">
-        <h2>Treinos registrados</h2>
+      <Secao titulo="Treinos registrados">
         {recentes.length ? (
-          <div className="list">
-            {recentes.map((r) => {
+          <List disablePadding>
+            {recentes.map((r, i) => {
               const t = ficha.treinos.find((x) => x.id === r.treinoId);
               const total = t ? t.exercicios.reduce((a, e) => a + e.series, 0) : r.registradas;
               const c = cardioDe(r.data, r.treinoId);
               return (
-                <div className="li" key={`${r.data}|${r.treinoId}`}>
-                  <div>
-                    <div className="t">
-                      {ddmm(r.data)} · {nomeTreino(r.treinoId)}
-                    </div>
-                    <div className="s">
-                      {r.feitas} de {total} séries{c ? ` · ${c} min de cardio` : ''}
-                    </div>
-                  </div>
-                  {abrirSessao && t && (
-                    <button type="button" className="btn ghost small" onClick={() => abrirSessao(r.data, r.treinoId)}>
-                      Abrir
-                    </button>
-                  )}
-                </div>
+                <Fragment key={`${r.data}|${r.treinoId}`}>
+                  {i > 0 && <Divider component="li" />}
+                  <ListItem
+                    disableGutters
+                    secondaryAction={
+                      abrirSessao && t ? (
+                        <Button size="small" variant="outlined" onClick={() => abrirSessao(r.data, r.treinoId)}>
+                          Abrir
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    <ListItemText
+                      primary={`${ddmm(r.data)} · ${nomeTreino(r.treinoId)}`}
+                      secondary={`${r.feitas} de ${total} séries${c ? ` · ${c} min de cardio` : ''}`}
+                      slotProps={{ primary: { sx: { fontWeight: 600 } } }}
+                    />
+                  </ListItem>
+                </Fragment>
               );
             })}
-          </div>
+          </List>
         ) : (
-          <p className="empty">
-            Nenhum treino registrado ainda. Eles aparecem aqui assim que a primeira série for anotada.
-          </p>
+          <Vazio>Nenhum treino registrado ainda. Eles aparecem aqui assim que a primeira série for anotada.</Vazio>
         )}
-      </div>
+      </Secao>
     </>
   );
 }
@@ -183,8 +212,8 @@ export function PainelEvolucao({ servidor, uid, ficha, catalogo, resumos, online
 export function TelaEvolucao() {
   const { servidor, usuario, ficha, catalogo, resumos, online, abrirSessao } = useApp();
   return (
-    <div className="stack">
-      <h1 className="titulo">Evolução</h1>
+    <>
+      <Cabecalho titulo="Evolução" />
       <PainelEvolucao
         servidor={servidor}
         uid={usuario.id}
@@ -194,6 +223,6 @@ export function TelaEvolucao() {
         online={online}
         abrirSessao={abrirSessao}
       />
-    </div>
+    </>
   );
 }

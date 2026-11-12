@@ -1,6 +1,28 @@
-import { useState, type FormEvent } from 'react';
+import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
+import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { Fragment, useState, type FormEvent } from 'react';
 import { useApp } from '../contexto';
 import { Grafico } from '../componentes/Grafico';
+import { Cabecalho, Secao, Vazio } from '../componentes/Pagina';
+import { FONTE_DISPLAY, NUMEROS } from '../tema';
 import { gravarCache } from '../dados/armazem';
 import { ddmm, hojeISO } from '../lib/datas';
 import { fmt, num } from '../lib/formato';
@@ -18,9 +40,15 @@ function direcao(objetivo: Objetivo, campo: Campo, delta: number): boolean | nul
 
 const REGRAS: Record<Objetivo, [string, string][]> = {
   perder: [
-    ['Cintura caindo e cargas subindo:', 'está funcionando. Não mude nada, mesmo com o peso parado (é gordura virando músculo).'],
+    [
+      'Cintura caindo e cargas subindo:',
+      'está funcionando. Não mude nada, mesmo com o peso parado (é gordura virando músculo).',
+    ],
     ['Peso caindo 0,3–0,5 kg por semana:', 'ritmo ideal para perder gordura sem perder músculo.'],
-    ['3 semanas sem a cintura cair:', 'corte ~200 kcal por dia (tire o macarrão ou a batata de uma refeição) ou some 2.000 passos por dia.'],
+    [
+      '3 semanas sem a cintura cair:',
+      'corte ~200 kcal por dia (tire o macarrão ou a batata de uma refeição) ou some 2.000 passos por dia.',
+    ],
     ['Peso caindo mais de 1 kg por semana e a força caindo:', 'coma ~200 kcal a mais.'],
   ],
   manter: [
@@ -55,7 +83,9 @@ export function TelaMedidas() {
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
-    const peso = num(form.peso, 400), cintura = num(form.cintura, 250), passos = num(form.passos, 100000);
+    const peso = num(form.peso, 400),
+      cintura = num(form.cintura, 250),
+      passos = num(form.passos, 100000);
     if (!form.data || (peso == null && cintura == null && passos == null)) {
       setMsg('Preencha pelo menos o peso ou a cintura.');
       return;
@@ -75,17 +105,17 @@ export function TelaMedidas() {
       setForm({ data: hoje, peso: '', cintura: '', passos: '' });
       setMsg(`Medidas de ${ddmm(nova.data)} salvas.`);
     } catch {
-      setMsg(online ? 'Não consegui salvar agora. Tente de novo em instantes.' : 'Sem conexão: tente de novo quando tiver sinal.');
+      setMsg(
+        online
+          ? 'Não consegui salvar agora. Tente de novo em instantes.'
+          : 'Sem conexão: tente de novo quando tiver sinal.',
+      );
     } finally {
       setSalvando(false);
     }
   }
 
   async function apagar(data: string) {
-    if (confirmar !== data) {
-      setConfirmar(data);
-      return;
-    }
     setConfirmar(null);
     try {
       await servidor.apagarMedicao(usuario.id, data);
@@ -96,132 +126,176 @@ export function TelaMedidas() {
   }
 
   const tile = (rotulo: string, arr: Medicao[], campo: Campo, unidade: string) => {
-    if (!arr.length)
-      return (
-        <div className="tile">
-          <div className="k">{rotulo}</div>
-          <div className="v">–</div>
-          <div className="d">sem registro</div>
-        </div>
-      );
-    const a = arr[0][campo] as number, z = arr[arr.length - 1][campo] as number, d = z - a;
-    const bom = arr.length < 2 ? null : direcao(perfil.objetivo, campo, d);
+    const ultimo = arr.length ? (arr[arr.length - 1][campo] as number) : null;
+    const d = arr.length >= 2 ? ultimo! - (arr[0][campo] as number) : null;
+    const bom = d == null ? null : direcao(perfil.objetivo, campo, d);
     return (
-      <div className="tile">
-        <div className="k">{rotulo}</div>
-        <div className="v">
-          {fmt(z)}
-          <small>{unidade}</small>
-        </div>
-        <div className={`d${bom === true ? ' good' : bom === false ? ' bad' : ''}`}>
-          {arr.length < 2 ? 'primeiro registro' : `${d > 0 ? '+' : ''}${fmt(d)} ${unidade} desde ${ddmm(arr[0].data)}`}
-        </div>
-      </div>
+      <Card sx={{ height: '100%' }}>
+        <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+          <Typography variant="overline" sx={{ color: 'text.secondary', lineHeight: 1.4, display: 'block' }}>
+            {rotulo}
+          </Typography>
+          <Typography sx={{ fontFamily: FONTE_DISPLAY, fontWeight: 700, fontSize: 38, lineHeight: 1.1, ...NUMEROS }}>
+            {ultimo == null ? '–' : fmt(ultimo)}
+            {ultimo != null && (
+              <Typography
+                component="span"
+                sx={{ fontSize: 18, ml: 0.5, color: 'text.secondary', fontFamily: 'inherit' }}
+              >
+                {unidade}
+              </Typography>
+            )}
+          </Typography>
+          {ultimo == null ? (
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              sem registro
+            </Typography>
+          ) : d == null ? (
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              primeiro registro
+            </Typography>
+          ) : (
+            <Chip
+              size="small"
+              variant="outlined"
+              color={bom === true ? 'success' : bom === false ? 'error' : 'default'}
+              label={`${d > 0 ? '+' : ''}${fmt(d)} ${unidade} desde ${ddmm(arr[0].data)}`}
+              sx={{ mt: 0.5, maxWidth: '100%' }}
+            />
+          )}
+        </CardContent>
+      </Card>
     );
   };
 
-  const campoForm = (k: keyof typeof form) => ({
+  const campoForm = (k: keyof typeof form, unidade?: string, inputMode?: 'decimal' | 'numeric') => ({
     value: form[k],
     onChange: (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value })),
     disabled: !online || salvando,
+    slotProps: {
+      htmlInput: { inputMode, autoComplete: 'off', max: k === 'data' ? hoje : undefined },
+      inputLabel: k === 'data' ? { shrink: true } : undefined,
+      input: unidade ? { endAdornment: <InputAdornment position="end">{unidade}</InputAdornment> } : undefined,
+    },
   });
 
   return (
-    <div className="stack">
-      <h1 className="titulo">Medidas</h1>
-      <div className="tiles">
-        {tile('Cintura no umbigo', comCintura, 'cintura', 'cm')}
-        {tile('Peso', comPeso, 'peso', 'kg')}
-      </div>
+    <>
+      <Cabecalho titulo="Medidas" />
+      <Grid container spacing={2}>
+        <Grid size={6}>{tile('Cintura no umbigo', comCintura, 'cintura', 'cm')}</Grid>
+        <Grid size={6}>{tile('Peso', comPeso, 'peso', 'kg')}</Grid>
+      </Grid>
 
-      <form className="card" onSubmit={salvar}>
-        <h2>Registrar a semana</h2>
-        <p className="muted small">
-          1x por semana, no mesmo dia: ao acordar, depois do banheiro e antes de comer. Fita na altura do umbigo, sem apertar.
-        </p>
-        {!online && <p className="aviso">Sem conexão: as medidas precisam de internet para salvar.</p>}
-        <div className="row2">
-          <label className="lbl" htmlFor="m-data">
-            Data
-            <input type="date" id="m-data" max={hoje} {...campoForm('data')} />
-          </label>
-          <label className="lbl" htmlFor="m-peso">
-            Peso (kg)
-            <input className="n" id="m-peso" inputMode="decimal" placeholder="75,0" autoComplete="off" {...campoForm('peso')} />
-          </label>
-          <label className="lbl" htmlFor="m-cint">
-            Cintura (cm)
-            <input className="n" id="m-cint" inputMode="decimal" placeholder="90,0" autoComplete="off" {...campoForm('cintura')} />
-          </label>
-          <label className="lbl" htmlFor="m-passos">
-            Média de passos/dia
-            <input className="n" id="m-passos" inputMode="numeric" placeholder="8000" autoComplete="off" {...campoForm('passos')} />
-          </label>
-        </div>
-        <button className="btn" type="submit" disabled={!online || salvando}>
-          Salvar medidas
-        </button>
-        <p className="note" role="status">
-          {msg}
-        </p>
-      </form>
+      <Secao
+        titulo="Registrar a semana"
+        subtitulo="1x por semana, no mesmo dia: ao acordar, depois do banheiro e antes de comer. Fita na altura do umbigo, sem apertar."
+      >
+        <Stack component="form" spacing={2} onSubmit={salvar}>
+          {!online && <Alert severity="warning">Sem conexão: as medidas precisam de internet para salvar.</Alert>}
+          <Grid container spacing={2}>
+            <Grid size={6}>
+              <TextField type="date" label="Data" {...campoForm('data')} />
+            </Grid>
+            <Grid size={6}>
+              <TextField label="Peso" placeholder="75,0" {...campoForm('peso', 'kg', 'decimal')} />
+            </Grid>
+            <Grid size={6}>
+              <TextField label="Cintura" placeholder="90,0" {...campoForm('cintura', 'cm', 'decimal')} />
+            </Grid>
+            <Grid size={6}>
+              <TextField label="Passos/dia (média)" placeholder="8000" {...campoForm('passos', undefined, 'numeric')} />
+            </Grid>
+          </Grid>
+          <Button type="submit" variant="contained" size="large" loading={salvando} disabled={!online}>
+            Salvar medidas
+          </Button>
+          {msg && !salvando && (
+            <Typography variant="body2" role="status" sx={{ color: 'text.secondary' }}>
+              {msg}
+            </Typography>
+          )}
+        </Stack>
+      </Secao>
 
-      <div className="card">
-        <h2>Cintura (cm)</h2>
-        <Grafico pontos={comCintura.map((m) => ({ data: m.data, y: m.cintura as number }))} unidade="cintura" />
-      </div>
-      <div className="card">
-        <h2>Peso (kg)</h2>
-        <Grafico pontos={comPeso.map((m) => ({ data: m.data, y: m.peso as number }))} unidade="peso" />
-      </div>
+      <Secao titulo="Cintura">
+        <Grafico
+          pontos={comCintura.map((m) => ({ data: m.data, y: m.cintura as number }))}
+          unidade="cintura"
+          sufixo=" cm"
+        />
+      </Secao>
+      <Secao titulo="Peso">
+        <Grafico pontos={comPeso.map((m) => ({ data: m.data, y: m.peso as number }))} unidade="peso" sufixo=" kg" />
+      </Secao>
 
-      <div className="card">
-        <h2>Como ler</h2>
-        <ul className="rules">
-          {REGRAS[perfil.objetivo].map(([t, d]) => (
-            <li key={t}>
-              <b>{t}</b> {d}
-            </li>
+      <Secao titulo="Como ler">
+        <List disablePadding>
+          {REGRAS[perfil.objetivo].map(([t, d], i) => (
+            <Fragment key={t}>
+              {i > 0 && <Divider component="li" />}
+              <ListItem disableGutters>
+                <ListItemText primary={t} secondary={d} slotProps={{ primary: { sx: { fontWeight: 600 } } }} />
+              </ListItem>
+            </Fragment>
           ))}
-        </ul>
-      </div>
+        </List>
+      </Secao>
 
-      <div className="card">
-        <h2>Registros</h2>
+      <Secao titulo="Registros">
         {lista.length ? (
-          <div className="list">
+          <List disablePadding>
             {lista
               .slice()
               .reverse()
-              .map((m) => (
-                <div className="li" key={m.data}>
-                  <div>
-                    <div className="t">{ddmm(m.data)}</div>
-                    <div className="s">
-                      {[
+              .map((m, i) => (
+                <Fragment key={m.data}>
+                  {i > 0 && <Divider component="li" />}
+                  <ListItem
+                    disableGutters
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        aria-label={`Apagar medidas de ${ddmm(m.data)}`}
+                        disabled={!online}
+                        onClick={() => setConfirmar(m.data)}
+                      >
+                        <DeleteOutlineRounded />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemText
+                      primary={ddmm(m.data)}
+                      secondary={[
                         m.peso != null ? `${fmt(m.peso)} kg` : null,
                         m.cintura != null ? `${fmt(m.cintura)} cm de cintura` : null,
                         m.passos != null ? `${fmt(m.passos, 0)} passos/dia` : null,
                       ]
                         .filter(Boolean)
                         .join(' · ')}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`btn ${confirmar === m.data ? 'danger' : 'ghost'} small`}
-                    disabled={!online}
-                    onClick={() => void apagar(m.data)}
-                  >
-                    {confirmar === m.data ? 'Confirmar' : 'Apagar'}
-                  </button>
-                </div>
+                      slotProps={{ primary: { sx: { fontWeight: 600 } } }}
+                    />
+                  </ListItem>
+                </Fragment>
               ))}
-          </div>
+          </List>
         ) : (
-          <p className="empty">Nenhuma medida ainda. Comece pela cintura: é o melhor sinal de como o corpo está mudando.</p>
+          <Vazio>Nenhuma medida ainda. Comece pela cintura: é o melhor sinal de como o corpo está mudando.</Vazio>
         )}
-      </div>
-    </div>
+      </Secao>
+
+      <Dialog open={confirmar !== null} onClose={() => setConfirmar(null)}>
+        <DialogTitle>Apagar as medidas de {confirmar ? ddmm(confirmar) : ''}?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.secondary' }}>Peso, cintura e passos desse dia saem do histórico.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmar(null)}>Cancelar</Button>
+          <Button color="error" variant="contained" onClick={() => confirmar && void apagar(confirmar)}>
+            Apagar
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

@@ -6,12 +6,15 @@ import '@fontsource/source-sans-3/latin-600.css';
 import '@fontsource/source-sans-3/latin-700.css';
 import './styles.css';
 
+import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider } from '@mui/material/styles';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { criarServidorSupabase } from './dados/servidorSupabase';
 import type { Servidor } from './dados/servidor';
+import { tema } from './tema';
 
 async function iniciar() {
   const servidor: Servidor =
@@ -20,7 +23,10 @@ async function iniciar() {
       : criarServidorSupabase();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App servidor={servidor} />
+      <ThemeProvider theme={tema}>
+        <CssBaseline enableColorScheme />
+        <App servidor={servidor} />
+      </ThemeProvider>
     </StrictMode>,
   );
 }
