@@ -1,0 +1,35 @@
+{
+  "name": "caderno-treino",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "demo": "vite --mode demo",
+    "build": "tsc --noEmit && vite build",
+    "build:demo": "vite build --mode demo --outDir dist-demo",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:banco": "node supabase/testes/regras-do-banco.mjs"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/source-sans-3": "^5.3.1",
+    "@supabase/supabase-js": "^2.119.0",
+    "idb-keyval": "^6.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "fake-indexeddb": "^6.2.8",
+    "typescript": "~5.9",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.0",
+    "workbox-window": "^7.4.1"
+  }
+}
