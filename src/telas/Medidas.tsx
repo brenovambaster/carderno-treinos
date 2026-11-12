@@ -88,7 +88,7 @@ export function TelaMedidas() {
     }
     setConfirmar(null);
     try {
-      await servidor.apagarMedicao(data);
+      await servidor.apagarMedicao(usuario.id, data);
       atualizar(medicoes.filter((m) => m.data !== data));
     } catch {
       setMsg('Não consegui apagar agora. Tente de novo com conexão.');
@@ -128,7 +128,7 @@ export function TelaMedidas() {
 
   return (
     <div className="stack">
-      <h1 style={{ fontSize: 36, textTransform: 'uppercase' }}>Medidas</h1>
+      <h1 className="titulo">Medidas</h1>
       <div className="tiles">
         {tile('Cintura no umbigo', comCintura, 'cintura', 'cm')}
         {tile('Peso', comPeso, 'peso', 'kg')}

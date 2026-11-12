@@ -1,12 +1,20 @@
 import { createContext, useContext } from 'react';
 import type { Servidor } from './dados/servidor';
 import type { EstadoSync, Sincronizador } from './dados/sincronizador';
-import type { Medicao, Perfil, ResumoSessao, Rotina, Usuario } from './lib/tipos';
+import type { Acesso, Exercicio, Ficha, Grupo, Medicao, Perfil, ResumoSessao, Usuario } from './lib/tipos';
+import type { Rota } from './rotas';
+
+export type Catalogo = { grupos: Grupo[]; exercicios: Exercicio[] };
 
 export type Contexto = {
   servidor: Servidor;
   usuario: Usuario;
-  rotina: Rotina;
+  acesso: Acesso;
+  ficha: Ficha;
+  /** Busca a própria ficha de novo (depois de editar) e guarda a cópia local. */
+  recarregarFicha: () => Promise<void>;
+  catalogo: Catalogo;
+  alterarCatalogo: (c: Catalogo) => void;
   perfil: Perfil;
   salvarPerfil: (p: Perfil) => Promise<void>;
   resumos: ResumoSessao[];
@@ -16,6 +24,7 @@ export type Contexto = {
   sync: Sincronizador;
   estadoSync: EstadoSync;
   online: boolean;
+  rota: Rota;
   iniciarDescanso: (segundos: number, rotulo: string) => void;
   pedidoAbrir: { data: string; treinoId: string; n: number } | null;
   abrirSessao: (data: string, treinoId: string) => void;

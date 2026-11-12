@@ -1,5 +1,5 @@
 import { instante, semana } from './datas';
-import type { ResumoSessao, Rotina, Serie, Treino } from './tipos';
+import type { ResumoSessao, Serie, Treino } from './tipos';
 
 /** A sessão mais recente (por data; empate pela última alteração). */
 export function sessaoMaisRecente(resumos: ResumoSessao[]): ResumoSessao | undefined {
@@ -17,19 +17,22 @@ export function sessaoMaisRecente(resumos: ResumoSessao[]): ResumoSessao | undef
   return melhor;
 }
 
-/** Próximo treino: o que vem depois do treino da sessão mais recente, na ordem da rotina. */
-export function proximoTreino(rotina: Rotina, resumos: ResumoSessao[]): Treino {
+/**
+ * Próximo treino: o que vem depois do treino da sessão mais recente, na ordem da ficha.
+ * Se esse treino saiu da ficha, recomeça pelo primeiro.
+ */
+export function proximoTreino(treinos: Treino[], resumos: ResumoSessao[]): Treino {
   const ultima = sessaoMaisRecente(resumos);
-  if (!ultima) return rotina[0];
-  const i = rotina.findIndex((t) => t.id === ultima.treinoId);
-  if (i < 0) return rotina[0];
-  return rotina[(i + 1) % rotina.length];
+  if (!ultima) return treinos[0];
+  const i = treinos.findIndex((t) => t.id === ultima.treinoId);
+  if (i < 0) return treinos[0];
+  return treinos[(i + 1) % treinos.length];
 }
 
 /** Ao abrir o app: a sessão de hoje, se já existe; senão, o próximo treino. */
-export function treinoAoAbrir(rotina: Rotina, resumos: ResumoSessao[], hoje: string): string {
-  const deHoje = sessaoMaisRecente(resumos.filter((r) => r.data === hoje));
-  return deHoje ? deHoje.treinoId : proximoTreino(rotina, resumos).id;
+export function treinoAoAbrir(treinos: Treino[], resumos: ResumoSessao[], hoje: string): string {
+  const deHoje = sessaoMaisRecente(resumos.filter((r) => r.data === hoje && treinos.some((t) => t.id === r.treinoId)));
+  return deHoje ? deHoje.treinoId : proximoTreino(treinos, resumos).id;
 }
 
 export function sessoesNaSemana(resumos: ResumoSessao[], hoje: string): number {

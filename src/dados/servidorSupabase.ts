@@ -1,5 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Cardio, Exercicio, Medicao, Perfil, ResumoSessao, Serie, Treino, Usuario } from '../lib/tipos';
+import type {
+  Acesso,
+  Cardio,
+  Exercicio,
+  Ficha,
+  Medicao,
+  Papel,
+  ResumoSessao,
+  Serie,
+  Usuario,
+  UsuarioPainel,
+} from '../lib/tipos';
 import { falha, paraUltimaVez, type Servidor } from './servidor';
 
 type Linha = Record<string, any>;
@@ -26,26 +37,36 @@ const paraCardio = (r: Linha): Cardio => ({
 
 const paraExercicio = (r: Linha): Exercicio => ({
   id: r.id,
-  treinoId: r.treino_id,
-  ordem: r.ordem,
   nome: r.nome,
-  series: r.series,
-  repsMin: r.reps_min,
-  repsMax: r.reps_max,
-  descanso: r.descanso,
-  descansoSeg: r.descanso_seg,
+  grupo: r.grupo,
   incremento: Number(r.incremento),
-  dica: r.dica,
+  dica: r.dica ?? '',
 });
 
-const paraTreino = (r: Linha): Treino => ({
-  id: r.id,
-  ordem: r.ordem,
+/** A ficha vem pronta do banco (ficha_de / ficha_padrao); só garante os números. */
+const paraFicha = (j: Linha): Ficha => ({
+  id: j.id,
+  userId: j.userId ?? null,
+  podeEditar: !!j.podeEditar,
+  arquivados: j.arquivados ?? [],
+  treinos: (j.treinos ?? []).map((t: Linha) => ({
+    ...t,
+    exercicios: (t.exercicios ?? []).map((e: Linha) => ({ ...e, incremento: Number(e.incremento) })),
+  })),
+});
+
+const paraUsuarioPainel = (r: Linha): UsuarioPainel => ({
+  email: r.email,
+  userId: r.user_id,
   nome: r.nome,
-  apelido: r.apelido,
-  foco: r.foco,
-  cardio: r.cardio,
-  exercicios: (r.exercicios ?? []).map(paraExercicio).sort((a: Exercicio, b: Exercicio) => a.ordem - b.ordem),
+  papel: r.papel,
+  ativo: !!r.ativo,
+  personal: r.personal_email,
+  convidadoEm: r.convidado_em,
+  ultimoAcesso: r.ultimo_acesso,
+  metaSemanal: r.meta_semanal,
+  ultimaSessao: r.ultima_sessao,
+  sessoes4Semanas: Number(r.sessoes_4_semanas ?? 0),
 });
 
 export function criarServidorSupabase(): Servidor {
@@ -75,7 +96,8 @@ export function criarServidorSupabase(): Servidor {
     },
     aoMudarSessao(cb) {
       const { data } = sb.auth.onAuthStateChange((evento, sessao) => {
-        if (evento === 'SIGNED_IN' || evento === 'TOKEN_REFRESHED' || evento === 'USER_UPDATED') cb(usuario(sessao?.user));
+        if (evento === 'SIGNED_IN' || evento === 'TOKEN_REFRESHED' || evento === 'USER_UPDATED')
+          cb(usuario(sessao?.user));
         else if (evento === 'SIGNED_OUT') cb(null);
       });
       return () => data.subscription.unsubscribe();
@@ -91,24 +113,57 @@ export function criarServidorSupabase(): Servidor {
     async sair() {
       await sb.auth.signOut();
     },
+    async meuAcesso() {
+      const a = (await q(sb.rpc('meu_acesso'))) as Linha;
+      return {
+        convidado: !!a?.convidado,
+        ativo: !!a?.ativo,
+        papel: (a?.papel ?? 'aluno') as Papel,
+        personal: a?.personal ?? null,
+      } satisfies Acesso;
+    },
 
-    async temConvite() {
-      return (await q(sb.rpc('tem_convite'))) === true;
+    async ficha(uid) {
+      return paraFicha((await q(sb.rpc('ficha_de', uid ? { p_user: uid } : {}))) as Linha);
     },
-    async rotina() {
-      // `series` também liga treinos a exercícios (muitos-para-muitos), então o PostgREST
-      // precisa saber qual ligação usar; sem isso responde 300 (PGRST201).
-      const linhas = await q(
+    async fichaPadrao() {
+      return paraFicha((await q(sb.rpc('ficha_padrao'))) as Linha);
+    },
+    async salvarFicha(fichaId, treinos) {
+      await q(sb.rpc('salvar_ficha', { p_ficha: fichaId, p_treinos: treinos }));
+    },
+
+    async catalogo() {
+      const [grupos, exercicios] = await Promise.all([
+        q(sb.from('grupos').select('id, nome, ordem').order('ordem')),
+        q(sb.from('exercicios').select('id, nome, grupo, incremento, dica').order('nome')),
+      ]);
+      return { grupos: grupos as any, exercicios: (exercicios as Linha[]).map(paraExercicio) };
+    },
+    async cadastrarExercicio(e) {
+      const r = await q(
         sb
-          .from('treinos')
-          .select('*, exercicios!exercicios_treino_id_fkey(*)')
-          .order('ordem')
-          .order('ordem', { referencedTable: 'exercicios' }),
+          .from('exercicios')
+          .insert({ nome: e.nome.trim(), grupo: e.grupo, incremento: e.incremento, dica: e.dica.trim() })
+          .select('id, nome, grupo, incremento, dica')
+          .single(),
       );
-      return (linhas as Linha[]).map(paraTreino);
+      return paraExercicio(r as Linha);
     },
-    async perfil() {
-      const r = (await q(sb.from('perfis').select('*').maybeSingle())) as Linha | null;
+    async alterarExercicio(e) {
+      await q(
+        sb
+          .from('exercicios')
+          .update({ nome: e.nome.trim(), grupo: e.grupo, incremento: e.incremento, dica: e.dica.trim() })
+          .eq('id', e.id),
+      );
+    },
+    async apagarExercicio(id) {
+      await q(sb.from('exercicios').delete().eq('id', id));
+    },
+
+    async perfil(uid) {
+      const r = (await q(sb.from('perfis').select('*').eq('user_id', uid).maybeSingle())) as Linha | null;
       if (!r) return null;
       return {
         sexo: r.sexo,
@@ -119,7 +174,7 @@ export function criarServidorSupabase(): Servidor {
         metaSemanal: r.meta_semanal,
       };
     },
-    async salvarPerfil(uid, p: Perfil) {
+    async salvarPerfil(uid, p) {
       await q(
         sb.from('perfis').upsert(
           {
@@ -137,29 +192,28 @@ export function criarServidorSupabase(): Servidor {
       );
     },
 
-    async resumos() {
+    async resumos(uid) {
       const linhas = await q(
         sb
           .from('resumo_sessoes')
           .select('data, treino_id, feitas, registradas, alterado_em')
+          .eq('user_id', uid)
           .order('data', { ascending: false })
           .order('alterado_em', { ascending: false })
           .limit(120),
       );
-      return (linhas as Linha[]).map(
-        (r): ResumoSessao => ({
-          data: r.data,
-          treinoId: r.treino_id,
-          feitas: Number(r.feitas),
-          registradas: Number(r.registradas),
-          alteradoEm: r.alterado_em,
-        }),
-      );
+      return (linhas as Linha[]).map((r): ResumoSessao => ({
+        data: r.data,
+        treinoId: r.treino_id,
+        feitas: Number(r.feitas),
+        registradas: Number(r.registradas),
+        alteradoEm: r.alterado_em,
+      }));
     },
-    async dia(data) {
+    async dia(uid, data) {
       const [series, cardios] = await Promise.all([
-        q(sb.from('series').select('*').eq('data', data)),
-        q(sb.from('sessoes').select('*').eq('data', data)),
+        q(sb.from('series').select('*').eq('user_id', uid).eq('data', data)),
+        q(sb.from('sessoes').select('*').eq('user_id', uid).eq('data', data)),
       ]);
       return { series: (series as Linha[]).map(paraSerie), cardios: (cardios as Linha[]).map(paraCardio) };
     },
@@ -199,11 +253,12 @@ export function criarServidorSupabase(): Servidor {
       );
     },
 
-    async historico(exercicioId) {
+    async historico(uid, exercicioId) {
       const linhas = await q(
         sb
           .from('series')
           .select('*')
+          .eq('user_id', uid)
           .eq('exercicio_id', exercicioId)
           .not('reps', 'is', null)
           .order('data', { ascending: false })
@@ -212,29 +267,69 @@ export function criarServidorSupabase(): Servidor {
       );
       return (linhas as Linha[]).map(paraSerie);
     },
-    async cardiosRecentes() {
+    async exerciciosFeitos(uid) {
+      const linhas = (await q(sb.rpc('exercicios_feitos', { p_user: uid }))) as unknown;
+      return (Array.isArray(linhas) ? linhas : []).map((l: any) => (typeof l === 'string' ? l : l.exercicios_feitos));
+    },
+    async cardiosRecentes(uid) {
       const linhas = await q(
-        sb.from('sessoes').select('*').not('cardio_min', 'is', null).order('data', { ascending: false }).limit(120),
+        sb
+          .from('sessoes')
+          .select('*')
+          .eq('user_id', uid)
+          .not('cardio_min', 'is', null)
+          .order('data', { ascending: false })
+          .limit(120),
       );
       return (linhas as Linha[]).map(paraCardio);
     },
 
-    async medicoes() {
-      const linhas = await q(sb.from('medicoes').select('data, peso, cintura, passos').order('data'));
-      return (linhas as Linha[]).map(
-        (r): Medicao => ({ data: r.data, peso: n(r.peso), cintura: n(r.cintura), passos: n(r.passos) }),
+    async medicoes(uid) {
+      const linhas = await q(
+        sb.from('medicoes').select('data, peso, cintura, passos').eq('user_id', uid).order('data'),
       );
+      return (linhas as Linha[]).map((r): Medicao => ({
+        data: r.data,
+        peso: n(r.peso),
+        cintura: n(r.cintura),
+        passos: n(r.passos),
+      }));
     },
     async salvarMedicao(uid, m) {
       await q(
-        sb.from('medicoes').upsert(
-          { user_id: uid, ...m, atualizado_em: new Date().toISOString() },
-          { onConflict: 'user_id,data' },
-        ),
+        sb
+          .from('medicoes')
+          .upsert({ user_id: uid, ...m, atualizado_em: new Date().toISOString() }, { onConflict: 'user_id,data' }),
       );
     },
-    async apagarMedicao(data) {
-      await q(sb.from('medicoes').delete().eq('data', data));
+    async apagarMedicao(uid, data) {
+      await q(sb.from('medicoes').delete().eq('user_id', uid).eq('data', data));
+    },
+
+    async usuarios() {
+      const linhas = await q(
+        sb.from('painel_usuarios').select('*').order('nome', { nullsFirst: false }).order('email'),
+      );
+      return (linhas as Linha[]).map(paraUsuarioPainel);
+    },
+    async convidar(u) {
+      await q(
+        sb.from('usuarios').insert({
+          email: u.email.trim().toLowerCase(),
+          papel: u.papel,
+          personal_email: u.papel === 'aluno' ? u.personal : null,
+        }),
+      );
+    },
+    async alterarUsuario(email, m) {
+      const mudanca: Linha = {};
+      if (m.papel !== undefined) mudanca.papel = m.papel;
+      if (m.ativo !== undefined) mudanca.ativo = m.ativo;
+      if (m.personal !== undefined) mudanca.personal_email = m.personal;
+      await q(sb.from('usuarios').update(mudanca).eq('email', email));
+    },
+    async cancelarConvite(email) {
+      await q(sb.from('usuarios').delete().eq('email', email));
     },
   };
 }

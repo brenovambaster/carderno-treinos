@@ -39,3 +39,9 @@ export function idade(nascimento: string, hoje: string): number {
 
 /** Compara dois instantes ISO (formatos diferentes do cliente e do servidor). */
 export const instante = (s: string | undefined | null) => (s ? Date.parse(s) : 0);
+
+/** "2026-11-12" ou um instante ISO → "12/11/2026" (no fuso do aparelho). */
+export function ddmmaaaa(s: string): string {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? parseISO(s) : new Date(s);
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}

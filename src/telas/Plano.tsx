@@ -5,10 +5,11 @@ import { hojeISO } from '../lib/datas';
 import { fmt } from '../lib/formato';
 import { calcularMetas, pesoAtual } from '../lib/metas';
 import { OBJETIVOS, TIPOS_TRABALHO } from '../lib/tipos';
+import { href } from '../rotas';
 import { FormPerfil } from './FormPerfil';
 
 export function TelaPlano() {
-  const { usuario, perfil, salvarPerfil, medicoes, rotina, sair, estadoSync } = useApp();
+  const { usuario, perfil, salvarPerfil, medicoes, ficha, acesso, sair, estadoSync } = useApp();
   const [editando, setEditando] = useState(false);
   const [confirmarSaida, setConfirmarSaida] = useState<number | null>(null);
   const peso = pesoAtual(medicoes);
@@ -28,7 +29,7 @@ export function TelaPlano() {
   if (editando) {
     return (
       <div className="stack">
-        <h1 style={{ fontSize: 36, textTransform: 'uppercase' }}>Seu perfil</h1>
+        <h1 className="titulo">Seu perfil</h1>
         <FormPerfil
           inicial={perfil}
           comPeso={false}
@@ -53,7 +54,7 @@ export function TelaPlano() {
 
   return (
     <div className="stack">
-      <h1 style={{ fontSize: 36, textTransform: 'uppercase' }}>Plano</h1>
+      <h1 className="titulo">Plano</h1>
       {m ? (
         <>
           <div className="tiles">
@@ -93,17 +94,23 @@ export function TelaPlano() {
       )}
 
       <div className="card">
-        <h2>A rotina</h2>
+        <h2>Sua ficha</h2>
         <table className="plan">
           <tbody>
-            {rotina.map((t) => (
+            {ficha.treinos.map((t) => (
               <tr key={t.id}>
                 <th>{t.ordem}</th>
                 <td>
                   <b>{t.nome}</b>
                   <br />
                   <span className="muted">
-                    {t.foco} · {t.cardio.replace('Depois: ', '').replace('Cardio opcional: ', 'opcional: ')}
+                    {[
+                      t.foco,
+                      `${t.exercicios.length} exercício${t.exercicios.length > 1 ? 's' : ''}`,
+                      t.cardio.replace('Depois: ', '').replace('Cardio opcional: ', 'opcional: '),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
                 </td>
               </tr>
@@ -114,6 +121,16 @@ export function TelaPlano() {
           O app sempre abre no próximo treino da sequência, em qualquer dia. Descanse quando precisar: nos dias de folga,
           uma caminhada leve de 30 a 60 minutos ajuda a recuperar.
         </p>
+        {acesso.personal && !ficha.podeEditar && (
+          <p className="muted small">
+            Quem monta a sua ficha é o seu personal (<b>{acesso.personal}</b>).
+          </p>
+        )}
+        <div className="btn-row">
+          <a className="btn ghost small" href={href({ v: 'ficha' })}>
+            {ficha.podeEditar ? 'Editar ficha' : 'Ver ficha completa'}
+          </a>
+        </div>
       </div>
 
       <div className="card">

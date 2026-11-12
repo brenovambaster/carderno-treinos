@@ -2,20 +2,16 @@
 
 ## O que já está pronto
 
-- **Banco no Supabase**: projeto `caderno-treino`, região São Paulo, plano grátis. Já tem as tabelas, as regras de acesso e a rotina padrão (6 treinos, 40 exercícios).
+- **Banco no Supabase**: projeto `caderno-treino`, região São Paulo, plano grátis. Já tem as tabelas, as regras de acesso, o catálogo de exercícios (40) e a Ficha padrão (6 treinos).
 - **O app** (esta pasta): o arquivo `.env` já aponta para esse projeto. A chave que está nele é a "publishable", feita para ir no navegador; quem protege os dados são as regras do banco.
 
-Falta o que depende das suas contas: liberar seu e-mail, ligar o login do Google, publicar na Vercel e agendar o backup.
+Falta o que depende das suas contas: ligar o login do Google, publicar na Vercel e agendar o backup.
 
-## 1. Liberar o seu e-mail
+## 1. Convidar pessoas
 
-No Supabase, abra **SQL Editor** e rode, com o e-mail da conta Google que você vai usar:
+O Admin é fixo: `brenovambaster5@gmail.com` (ADR 0003). Ele convida pelo próprio app, na aba **Usuários → Convidar alguém**, já escolhendo o papel (Aluno ou Personal) e, para aluno, o personal. Na mesma aba ele desativa e reativa acessos, muda papéis e liga aluno a personal.
 
-```sql
-insert into public.convites (email) values ('seu-email@gmail.com');
-```
-
-O mesmo comando serve para convidar outra pessoa. Para tirar alguém: `delete from public.convites where email = '...'`. Para apagar também os dados dessa pessoa, apague o usuário em **Authentication → Users**.
+Pelo app dá para cancelar o convite de quem ainda não entrou. Para apagar de vez alguém que já usou o app, junto com os dados, apague o usuário em **Authentication → Users** no Supabase e depois a linha dele em `public.usuarios`.
 
 ## 2. Publicar na Vercel
 
@@ -68,7 +64,12 @@ O plano grátis do Supabase não faz backup. O script `scripts/backup.sh` faz um
    15 4 * * * /caminho/para/caderno-treino/scripts/backup.sh >> $HOME/backups/caderno-treino.log 2>&1
    ```
 
-**Para restaurar** num projeto novo: aplique as migrações `..._esquema.sql` e `..._ajustes_seguranca.sql` (a rotina vem no próprio backup) e rode `gunzip -c arquivo.sql.gz | psql "$SUPABASE_DB_URL"`.
+**Para restaurar** num projeto novo: aplique todas as migrações de `supabase/migrations`, em ordem. Elas já criam o catálogo e a Ficha padrão, que também estão no backup; por isso, esvazie essas tabelas antes de carregar:
+
+```sh
+psql "$SUPABASE_DB_URL" -c "truncate public.usuarios, public.grupos, public.exercicios, public.fichas cascade"
+gunzip -c arquivo.sql.gz | psql "$SUPABASE_DB_URL"
+```
 
 ## Rodar no computador
 
@@ -76,11 +77,11 @@ O plano grátis do Supabase não faz backup. O script `scripts/backup.sh` faz um
 npm install
 npm run demo   # telas com dados de exemplo, sem login (servidor de mentira na memória)
 npm run dev    # app de verdade, ligado ao Supabase (precisa do passo 3)
-npm test       # regras: sugestão de carga, próximo treino, metas, fila sem sinal
-npm run test:banco  # regras de acesso do banco, num Postgres local (PGlite)
+npm test       # regras: sugestão de carga, próximo treino, metas, fila sem sinal, edição da ficha
+npm run test:banco  # migrações e regras de acesso de cada papel, num Postgres local (PGlite)
 ```
 
-No modo demo dá para ver as telas de entrada com `?tela=login`, `?tela=perfil` ou `?tela=convite` na URL.
+No modo demo dá para ver as telas de entrada com `?tela=login`, `?tela=perfil`, `?tela=convite` ou `?tela=inativo` na URL, e o app de cada papel com `?papel=admin` (o padrão), `?papel=personal`, `?papel=aluno` ou `?papel=aluno-com-personal`.
 
 ## Pausa do plano grátis
 

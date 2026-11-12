@@ -1,25 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppCtx, type Contexto } from './contexto';
+import { AppCtx, type Catalogo, type Contexto } from './contexto';
 import { Cronometro, useCronometro } from './componentes/Cronometro';
-import { Abas, Topo, type Vista } from './componentes/Moldura';
+import { Abas, Topo } from './componentes/Moldura';
 import { gravarCache, lerCache, pendentes, semTipo } from './dados/armazem';
 import { ehSemRede, type Servidor } from './dados/servidor';
 import { Sincronizador, type EstadoSync } from './dados/sincronizador';
 import { hojeISO } from './lib/datas';
 import { resumosComPendentes } from './lib/sequencia';
-import type { Medicao, Perfil, ResumoSessao, Rotina, Serie, Usuario } from './lib/tipos';
-import { TelaLogin, TelaPrimeiroAcesso, TelaSemConvite, TelaSemDados } from './telas/Entrada';
+import type { Acesso, Ficha, Medicao, Perfil, ResumoSessao, Serie, Usuario } from './lib/tipos';
+import { abaDe, href, lerRota, permitida, type Rota } from './rotas';
+import { TelaCatalogo } from './telas/Catalogo';
+import { TelaLogin, TelaInativo, TelaPrimeiroAcesso, TelaSemConvite, TelaSemDados } from './telas/Entrada';
 import { TelaEvolucao } from './telas/Evolucao';
+import { TelaFichaPadrao, TelaFichaUsuario, TelaMinhaFicha } from './telas/Fichas';
 import { FormPerfil } from './telas/FormPerfil';
 import { TelaMedidas } from './telas/Medidas';
 import { TelaPlano } from './telas/Plano';
 import { TelaTreino } from './telas/Treino';
+import { TelaUsuario, TelaUsuarios } from './telas/Usuarios';
 
 const ULTIMO_USUARIO = 'caderno-treino:usuario';
-const VISTAS: Vista[] = ['treino', 'evolucao', 'medidas', 'plano'];
 
-type Dados = { rotina: Rotina; perfil: Perfil; resumos: ResumoSessao[]; medicoes: Medicao[] };
-type Fase = 'carregando' | 'login' | 'sem-convite' | 'primeiro-acesso' | 'sem-dados' | 'app';
+type Dados = {
+  acesso: Acesso;
+  ficha: Ficha;
+  catalogo: Catalogo;
+  perfil: Perfil;
+  resumos: ResumoSessao[];
+  medicoes: Medicao[];
+};
+type Fase = 'carregando' | 'login' | 'sem-convite' | 'inativo' | 'primeiro-acesso' | 'sem-dados' | 'app';
 
 function lerUltimoUsuario(): Usuario | null {
   try {
@@ -27,11 +37,6 @@ function lerUltimoUsuario(): Usuario | null {
   } catch {
     return null;
   }
-}
-
-function lerVista(): Vista {
-  const h = location.hash.replace('#', '') as Vista;
-  return VISTAS.includes(h) ? h : 'treino';
 }
 
 /** Tira da URL o que o login do Google deixou (?code=...). */
@@ -47,42 +52,57 @@ function limparUrl() {
   if (mudou) history.replaceState(null, '', url.pathname + url.search + url.hash);
 }
 
-/** Busca no servidor e guarda uma cópia; sem sinal, usa a cópia. */
-async function buscar<T>(chave: string, f: () => Promise<T>): Promise<T | undefined> {
+/** Busca no servidor e guarda uma cópia; se falhar, usa a cópia e anota o erro. */
+async function buscar<T>(chave: string, f: () => Promise<T>, erros: string[]): Promise<T | undefined> {
   try {
     const v = await f();
     void gravarCache(chave, v);
     return v;
-  } catch {
+  } catch (e) {
+    if (!ehSemRede(e)) erros.push((e as Error).message);
     return lerCache<T>(chave);
   }
 }
 
-async function carregar(servidor: Servidor, u: Usuario): Promise<{ fase: Fase; dados?: Dados }> {
-  const convite = await buscar(`convite:${u.id}`, () => servidor.temConvite());
-  if (convite === false) return { fase: 'sem-convite' };
-  const [rotina, perfil, resumos, medicoes] = await Promise.all([
-    buscar('rotina', () => servidor.rotina()),
-    buscar(`perfil:${u.id}`, () => servidor.perfil()),
-    buscar(`resumos:${u.id}`, () => servidor.resumos()),
-    buscar(`medicoes:${u.id}`, () => servidor.medicoes()),
+type Carga = { fase: Fase; dados?: Dados; erro?: string };
+
+async function carregar(servidor: Servidor, u: Usuario): Promise<Carga> {
+  const erros: string[] = [];
+  const acesso = await buscar(`acesso:${u.id}`, () => servidor.meuAcesso(), erros);
+  if (!acesso) return { fase: 'sem-dados', erro: erros[0] };
+  if (!acesso.convidado) return { fase: 'sem-convite' };
+  if (!acesso.ativo) return { fase: 'inativo' };
+  const [ficha, catalogo, perfil, resumos, medicoes] = await Promise.all([
+    buscar(`ficha:${u.id}`, () => servidor.ficha(), erros),
+    buscar('catalogo', () => servidor.catalogo(), erros),
+    buscar(`perfil:${u.id}`, () => servidor.perfil(u.id), erros),
+    buscar(`resumos:${u.id}`, () => servidor.resumos(u.id), erros),
+    buscar(`medicoes:${u.id}`, () => servidor.medicoes(u.id), erros),
   ]);
-  if (!rotina?.length || perfil === undefined) return { fase: 'sem-dados' };
+  if (!ficha?.treinos?.length || !catalogo || perfil === undefined) return { fase: 'sem-dados', erro: erros[0] };
   if (perfil === null) return { fase: 'primeiro-acesso' };
   const daFila = (await pendentes(u.id)).filter((i) => i.tipo === 'serie').map((i) => semTipo(i) as Serie);
   return {
     fase: 'app',
-    dados: { rotina, perfil, resumos: resumosComPendentes(resumos ?? [], daFila), medicoes: medicoes ?? [] },
+    dados: {
+      acesso,
+      ficha,
+      catalogo,
+      perfil,
+      resumos: resumosComPendentes(resumos ?? [], daFila),
+      medicoes: medicoes ?? [],
+    },
   };
 }
 
 export function App({ servidor }: { servidor: Servidor }) {
   const [usuario, setUsuario] = useState<Usuario | null | undefined>(undefined);
   const [fase, setFase] = useState<Fase>('carregando');
+  const [erro, setErro] = useState<string | undefined>();
   const [dados, setDados] = useState<Dados | null>(null);
   const [tentativa, setTentativa] = useState(0);
   const [online, setOnline] = useState(navigator.onLine);
-  const [vista, setVista] = useState<Vista>(lerVista);
+  const [rota, setRota] = useState<Rota>(() => lerRota());
   const [estadoSync, setEstadoSync] = useState<EstadoSync>({ estado: 'em-dia', pendentes: 0 });
   const [pedidoAbrir, setPedidoAbrir] = useState<Contexto['pedidoAbrir']>(null);
   const cronometro = useCronometro();
@@ -129,6 +149,7 @@ export function App({ servidor }: { servidor: Servidor }) {
     carregar(servidor, usuario).then((r) => {
       if (!vivo) return;
       if (r.dados) setDados(r.dados);
+      setErro(r.erro);
       setFase(r.fase);
     });
     return () => {
@@ -140,7 +161,7 @@ export function App({ servidor }: { servidor: Servidor }) {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
     const hash = () => {
-      setVista(lerVista());
+      setRota(lerRota());
       window.scrollTo(0, 0);
     };
     window.addEventListener('online', on);
@@ -166,11 +187,27 @@ export function App({ servidor }: { servidor: Servidor }) {
     if (uid && dados) void gravarCache(`resumos:${uid}`, dados.resumos);
   }, [uid, dados?.resumos]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Rota que o papel não abre volta para o treino.
+  const papel = dados?.acesso.papel;
+  useEffect(() => {
+    if (papel && !permitida(rota, papel)) location.replace(href({ v: 'treino' }));
+  }, [rota, papel]);
+
   const alterarResumos = useCallback(
     (f: (r: ResumoSessao[]) => ResumoSessao[]) => setDados((d) => (d ? { ...d, resumos: f(d.resumos) } : d)),
     [],
   );
   const alterarMedicoes = useCallback((m: Medicao[]) => setDados((d) => (d ? { ...d, medicoes: m } : d)), []);
+  const alterarCatalogo = useCallback((c: Catalogo) => {
+    setDados((d) => (d ? { ...d, catalogo: c } : d));
+    void gravarCache('catalogo', c);
+  }, []);
+  const recarregarFicha = useCallback(async () => {
+    if (!uid) return;
+    const f = await servidor.ficha();
+    setDados((d) => (d ? { ...d, ficha: f } : d));
+    void gravarCache(`ficha:${uid}`, f);
+  }, [servidor, uid]);
 
   const sair = useCallback(async () => {
     try {
@@ -182,6 +219,8 @@ export function App({ servidor }: { servidor: Servidor }) {
     setUsuario(null);
   }, [servidor]);
 
+  const deNovo = () => setTentativa((t) => t + 1);
+
   if (fase === 'carregando' || usuario === undefined) {
     return (
       <>
@@ -192,8 +231,9 @@ export function App({ servidor }: { servidor: Servidor }) {
   }
   if (fase === 'login' || !usuario) return <TelaLogin entrar={() => servidor.entrarComGoogle()} />;
   if (fase === 'sem-convite')
-    return <TelaSemConvite email={usuario.email} sair={() => void sair()} tentarDeNovo={() => setTentativa((t) => t + 1)} />;
-  if (fase === 'sem-dados') return <TelaSemDados tentarDeNovo={() => setTentativa((t) => t + 1)} />;
+    return <TelaSemConvite email={usuario.email} sair={() => void sair()} tentarDeNovo={deNovo} />;
+  if (fase === 'inativo') return <TelaInativo email={usuario.email} sair={() => void sair()} tentarDeNovo={deNovo} />;
+  if (fase === 'sem-dados') return <TelaSemDados erro={online ? erro : undefined} tentarDeNovo={deNovo} />;
   if (fase === 'primeiro-acesso') {
     return (
       <TelaPrimeiroAcesso>
@@ -202,8 +242,9 @@ export function App({ servidor }: { servidor: Servidor }) {
           rotuloBotao="Começar"
           aoSalvar={async (p, peso) => {
             await servidor.salvarPerfil(usuario.id, p);
-            if (peso != null) await servidor.salvarMedicao(usuario.id, { data: hojeISO(), peso, cintura: null, passos: null });
-            setTentativa((t) => t + 1);
+            if (peso != null)
+              await servidor.salvarMedicao(usuario.id, { data: hojeISO(), peso, cintura: null, passos: null });
+            deNovo();
           }}
         />
       </TelaPrimeiroAcesso>
@@ -214,7 +255,11 @@ export function App({ servidor }: { servidor: Servidor }) {
   const ctx: Contexto = {
     servidor,
     usuario,
-    rotina: dados.rotina,
+    acesso: dados.acesso,
+    ficha: dados.ficha,
+    recarregarFicha,
+    catalogo: dados.catalogo,
+    alterarCatalogo,
     perfil: dados.perfil,
     salvarPerfil: async (p) => {
       await servidor.salvarPerfil(usuario.id, p);
@@ -228,6 +273,7 @@ export function App({ servidor }: { servidor: Servidor }) {
     sync,
     estadoSync,
     online,
+    rota,
     iniciarDescanso: cronometro.iniciar,
     pedidoAbrir,
     abrirSessao: (data, treinoId) => {
@@ -236,22 +282,30 @@ export function App({ servidor }: { servidor: Servidor }) {
     },
     sair,
   };
+  const visivel = permitida(rota, dados.acesso.papel) ? rota : ({ v: 'treino' } as Rota);
 
   return (
     <AppCtx.Provider value={ctx}>
       <Topo estado={estadoSync} online={online} />
       <main>
         <div className="wrap">
-          <div hidden={vista !== 'treino'}>
+          {/* O treino fica montado para não perder o que está sendo digitado ao trocar de aba. */}
+          <div hidden={visivel.v !== 'treino'}>
             <TelaTreino />
           </div>
-          {vista === 'evolucao' && <TelaEvolucao />}
-          {vista === 'medidas' && <TelaMedidas />}
-          {vista === 'plano' && <TelaPlano />}
+          {visivel.v === 'evolucao' && <TelaEvolucao />}
+          {visivel.v === 'medidas' && <TelaMedidas />}
+          {visivel.v === 'plano' && <TelaPlano />}
+          {visivel.v === 'ficha' && <TelaMinhaFicha />}
+          {visivel.v === 'usuarios' && <TelaUsuarios />}
+          {visivel.v === 'usuario' && <TelaUsuario key={visivel.email} email={visivel.email} />}
+          {visivel.v === 'ficha-usuario' && <TelaFichaUsuario key={visivel.email} email={visivel.email} />}
+          {visivel.v === 'padrao' && <TelaFichaPadrao />}
+          {visivel.v === 'catalogo' && <TelaCatalogo />}
         </div>
       </main>
       <Cronometro c={cronometro} />
-      <Abas atual={vista} />
+      <Abas atual={abaDe(visivel)} papel={dados.acesso.papel} />
     </AppCtx.Provider>
   );
 }

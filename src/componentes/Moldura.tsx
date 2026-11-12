@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { EstadoSync } from '../dados/sincronizador';
+import type { Papel } from '../lib/tipos';
 
-export type Vista = 'treino' | 'evolucao' | 'medidas' | 'plano';
+export type Aba = 'treino' | 'evolucao' | 'medidas' | 'plano' | 'usuarios';
 
 function status(e: EstadoSync, online: boolean): [string, string] {
   if (e.estado === 'salvando') return ['saving', 'Salvando…'];
@@ -25,7 +26,7 @@ export function Topo({ estado, online }: { estado?: EstadoSync; online: boolean 
   );
 }
 
-const ABAS: { v: Vista; rotulo: string; icone: ReactNode }[] = [
+const ABAS: { v: Aba; rotulo: string; icone: ReactNode }[] = [
   { v: 'treino', rotulo: 'Treino', icone: <path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12" /> },
   { v: 'evolucao', rotulo: 'Evolução', icone: <path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6" /> },
   {
@@ -51,11 +52,25 @@ const ABAS: { v: Vista; rotulo: string; icone: ReactNode }[] = [
   },
 ];
 
-export function Abas({ atual }: { atual: Vista }) {
+const ABA_USUARIOS = (papel: Papel) => ({
+  v: 'usuarios' as const,
+  rotulo: papel === 'admin' ? 'Usuários' : 'Alunos',
+  icone: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+      <circle cx="17" cy="9" r="2.4" />
+      <path d="M16 14c2.8 0 5 1.8 5 4.6" />
+    </>
+  ),
+});
+
+export function Abas({ atual, papel }: { atual: Aba; papel: Papel }) {
+  const abas = papel === 'aluno' ? ABAS : [...ABAS, ABA_USUARIOS(papel)];
   return (
     <nav className="tabs" aria-label="Seções">
-      <div className="wrap">
-        {ABAS.map((a) => (
+      <div className="wrap" style={{ gridTemplateColumns: `repeat(${abas.length}, 1fr)` }}>
+        {abas.map((a) => (
           <a key={a.v} href={`#${a.v}`} aria-current={a.v === atual ? 'page' : undefined}>
             <svg viewBox="0 0 24 24">{a.icone}</svg>
             {a.rotulo}

@@ -74,11 +74,45 @@ export function TelaPrimeiroAcesso({ children }: { children: ReactNode }) {
   );
 }
 
-export function TelaSemDados({ tentarDeNovo }: { tentarDeNovo: () => void }) {
+export function TelaInativo({ email, sair, tentarDeNovo }: { email: string; sair: () => void; tentarDeNovo: () => void }) {
   return (
     <Moldura>
-      <h1>Sem conexão</h1>
-      <p>Na primeira vez, o app precisa de internet para baixar a rotina e o seu perfil. Depois disso, a tela de treino funciona sem sinal.</p>
+      <h1>Acesso desativado</h1>
+      <p>
+        O acesso de <b>{email}</b> está desativado. Seus treinos e medidas continuam guardados e voltam quando o acesso for
+        reativado. Fale com quem administra o app.
+      </p>
+      <div className="btn-row">
+        <button type="button" className="btn" onClick={tentarDeNovo}>
+          Tentar de novo
+        </button>
+        <button type="button" className="btn ghost" onClick={sair}>
+          Entrar com outra conta
+        </button>
+      </div>
+    </Moldura>
+  );
+}
+
+/** Não deu para carregar e não há cópia no aparelho. `erro` só vem quando há internet. */
+export function TelaSemDados({ erro, tentarDeNovo }: { erro?: string; tentarDeNovo: () => void }) {
+  return (
+    <Moldura>
+      {erro ? (
+        <>
+          <h1>Algo deu errado</h1>
+          <p>Não consegui carregar sua ficha e seu perfil. O servidor respondeu:</p>
+          <p className="aviso">{erro}</p>
+        </>
+      ) : (
+        <>
+          <h1>Sem conexão</h1>
+          <p>
+            Na primeira vez, o app precisa de internet para baixar a ficha de treino e o seu perfil. Depois disso, a tela de
+            treino funciona sem sinal.
+          </p>
+        </>
+      )}
       <button type="button" className="btn" onClick={tentarDeNovo}>
         Tentar de novo
       </button>

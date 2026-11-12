@@ -4,10 +4,10 @@ import { CHECK } from '../componentes/Moldura';
 import { chaveSerie, enfileirar, gravarCache, lerCache, pendentes, type ItemFila } from '../dados/armazem';
 import { listaDoDia, montarDia, type Dia } from '../dados/dia';
 import { ddmm, hojeISO } from '../lib/datas';
-import { fmt, LIMITE_CARGA, LIMITE_REPS, num } from '../lib/formato';
+import { fmt, LIMITE_CARGA, LIMITE_REPS, num, textoDescanso } from '../lib/formato';
 import { atualizarResumo, proximoTreino, serieRegistrada, sessoesNaSemana, treinoAoAbrir } from '../lib/sequencia';
 import { sugerir, type Sugestao } from '../lib/sugestao';
-import type { Cardio, Exercicio, Serie, UltimaVez } from '../lib/tipos';
+import type { Cardio, ExercicioDoTreino, Serie, UltimaVez } from '../lib/tipos';
 
 const campo = (n: number | null) => (n == null ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 2, useGrouping: false }));
 const inteiro = (v: string, max: number) => {
@@ -15,7 +15,7 @@ const inteiro = (v: string, max: number) => {
   return n == null ? null : Math.round(n);
 };
 
-function Dica({ ex, sg }: { ex: Exercicio; sg: Sugestao }) {
+function Dica({ ex, sg }: { ex: ExercicioDoTreino; sg: Sugestao }) {
   if (sg.tipo === 'primeira') {
     return (
       <div className="hint first">
@@ -62,11 +62,12 @@ function Dica({ ex, sg }: { ex: Exercicio; sg: Sugestao }) {
 }
 
 export function TelaTreino() {
-  const { servidor, usuario, rotina, perfil, resumos, alterarResumos, sync, iniciarDescanso, pedidoAbrir } = useApp();
+  const { servidor, usuario, ficha, perfil, resumos, alterarResumos, sync, iniciarDescanso, pedidoAbrir } = useApp();
+  const treinos = ficha.treinos;
   const uid = usuario.id;
   const hoje = hojeISO();
   const [data, setData] = useState(hoje);
-  const [treinoId, setTreinoId] = useState(() => treinoAoAbrir(rotina, resumos, hoje));
+  const [treinoId, setTreinoId] = useState(() => treinoAoAbrir(treinos, resumos, hoje));
   const [dia, setDia] = useState<Dia | null>(null);
   const [uv, setUv] = useState<UltimaVez>({});
   const [textos, setTextos] = useState<Record<string, string>>({});
@@ -86,7 +87,7 @@ export function TelaTreino() {
     (async () => {
       let base: { series: Serie[]; cardios: Cardio[] } | undefined;
       try {
-        base = await servidor.dia(data);
+        base = await servidor.dia(uid, data);
       } catch {
         base = await lerCache(`dia:${uid}:${data}`);
       }
@@ -126,15 +127,15 @@ export function TelaTreino() {
     return () => clearTimeout(t);
   }, [dia, treinoId, uid, alterarResumos]);
 
-  const treino = rotina.find((t) => t.id === treinoId) ?? rotina[0];
-  const proximo = proximoTreino(rotina, resumos);
+  const treino = treinos.find((t) => t.id === treinoId) ?? treinos[0];
+  const proximo = proximoTreino(treinos, resumos);
   const pronto = dia != null && dia.data === data;
   const sugestoes = useMemo(
     () => Object.fromEntries(treino.exercicios.map((e) => [e.id, sugerir(e, uv[e.id])])),
     [treino, uv],
   );
 
-  const vazia = (ex: Exercicio, i: number): Serie => ({
+  const vazia = (ex: ExercicioDoTreino, i: number): Serie => ({
     data,
     treinoId: treino.id,
     exercicioId: ex.id,
@@ -144,7 +145,7 @@ export function TelaTreino() {
     feita: false,
     alteradoEm: '',
   });
-  const seriesDe = (ex: Exercicio): Serie[] =>
+  const seriesDe = (ex: ExercicioDoTreino): Serie[] =>
     Array.from(
       { length: ex.series },
       (_, i) => dia?.series[chaveSerie({ data, treinoId: treino.id, exercicioId: ex.id, indice: i })] ?? vazia(ex, i),
@@ -163,24 +164,24 @@ export function TelaTreino() {
     void enfileirar(uid, itens).then(() => sync.agendar());
   }
 
-  function alterar(ex: Exercicio, i: number, mudanca: Partial<Serie>) {
+  function alterar(ex: ExercicioDoTreino, i: number, mudanca: Partial<Serie>) {
     const atual = seriesDe(ex)[i];
     gravar([{ ...atual, ...mudanca, alteradoEm: new Date().toISOString() }]);
   }
 
-  function phCarga(ex: Exercicio, series: Serie[], i: number, sg: Sugestao): string {
+  function phCarga(ex: ExercicioDoTreino, series: Serie[], i: number, sg: Sugestao): string {
     const anterior = i > 0 ? series[i - 1] : null;
     if (anterior?.feita && anterior.carga != null) return campo(anterior.carga);
     if (sg.carga != null) return campo(sg.carga);
     return ex.incremento === 0 ? '—' : '';
   }
-  function phReps(ex: Exercicio, i: number, sg: Sugestao): string {
+  function phReps(ex: ExercicioDoTreino, i: number, sg: Sugestao): string {
     if (sg.tipo === 'manter' && sg.reps[i] != null) return String(sg.reps[i]);
     if (sg.tipo === 'subir' || sg.tipo === 'subir-corpo') return '';
     return String(ex.repsMin);
   }
 
-  function marcar(ex: Exercicio, i: number) {
+  function marcar(ex: ExercicioDoTreino, i: number) {
     const series = seriesDe(ex);
     const s = series[i];
     if (s.feita) {
@@ -222,7 +223,7 @@ export function TelaTreino() {
   return (
     <div className="stack">
       <div className="chips" role="group" aria-label="Escolha o treino">
-        {rotina.map((t) => {
+        {treinos.map((t) => {
           const tem = pronto && Object.values(dia.series).some((s) => s.treinoId === t.id && serieRegistrada(s));
           return (
             <button
@@ -247,7 +248,8 @@ export function TelaTreino() {
         <div>
           <h1>{treino.nome}</h1>
           <p className="sub">
-            {treino.foco} · {treino.ordem}º da sequência
+            {treino.foco ? `${treino.foco} · ` : ''}
+            {treino.ordem}º da sequência
             {treino.id === proximo.id && <span className="tag">próximo</span>}
           </p>
         </div>
@@ -289,7 +291,8 @@ export function TelaTreino() {
                   <div>
                     <h2>{ex.nome}</h2>
                     <p>
-                      {ex.series} séries · {ex.repsMin}–{ex.repsMax} reps · descanso {ex.descanso}
+                      {ex.series} séries · {ex.repsMin === ex.repsMax ? ex.repsMin : `${ex.repsMin}–${ex.repsMax}`} reps · descanso{' '}
+                      {textoDescanso(ex.descansoSeg)}
                     </p>
                   </div>
                 </div>
@@ -349,10 +352,12 @@ export function TelaTreino() {
                     );
                   })}
                 </div>
-                <details>
-                  <summary>Como fazer</summary>
-                  <p>{ex.dica}</p>
-                </details>
+                {ex.dica && (
+                  <details>
+                    <summary>Como fazer</summary>
+                    <p>{ex.dica}</p>
+                  </details>
+                )}
               </article>
             );
           })}
@@ -360,7 +365,8 @@ export function TelaTreino() {
           <div className="card">
             <h2>Cardio</h2>
             <p className="muted small">
-              {treino.cardio}. Esteira com 8–12% de inclinação, num ritmo em que dá para conversar com esforço.
+              {treino.cardio ? `${treino.cardio}. ` : ''}Esteira com 8–12% de inclinação, num ritmo em que dá para conversar com
+              esforço.
             </p>
             <label className="lbl" htmlFor="cardio">
               Minutos feitos

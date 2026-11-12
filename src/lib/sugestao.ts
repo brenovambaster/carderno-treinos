@@ -1,4 +1,4 @@
-import type { Exercicio, UltimaSessao } from './tipos';
+import type { ExercicioDoTreino, UltimaSessao } from './tipos';
 
 export type Sugestao =
   | { tipo: 'primeira'; carga: null; reps: number[] }
@@ -10,7 +10,10 @@ export type Sugestao =
  * Sugestão de carga: mantenha a carga e some repetições; quando todas as séries
  * chegarem ao topo da faixa, suba a carga.
  */
-export function sugerir(ex: Exercicio, ultima: UltimaSessao | undefined): Sugestao {
+export function sugerir(
+  ex: Pick<ExercicioDoTreino, 'series' | 'repsMax' | 'incremento'>,
+  ultima: UltimaSessao | undefined,
+): Sugestao {
   if (!ultima || ultima.series.length === 0) return { tipo: 'primeira', carga: null, reps: [] };
 
   const cargas = ultima.series.map((s) => s.carga).filter((c): c is number => c != null);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import rotinaJson from '../dados/demo/rotina.json';
+import padrao from '../dados/demo/padrao.json';
 import { calcularMetas, fatorAtividade, pesoAtual } from './metas';
 import {
   atualizarResumo,
@@ -9,11 +9,11 @@ import {
   treinoAoAbrir,
 } from './sequencia';
 import { sugerir } from './sugestao';
-import type { Exercicio, Perfil, ResumoSessao, Rotina, Serie } from './tipos';
+import type { Perfil, ResumoSessao, Serie, Treino } from './tipos';
 
-const rotina = rotinaJson as Rotina;
-const agach = rotina[0].exercicios[0] as Exercicio; // 3 séries, 6–10, +5 kg
-const barra = rotina[4].exercicios.find((e) => e.id === 'barra-fixa') as Exercicio; // peso do corpo
+const rotina = padrao.treinos as Treino[];
+const agach = rotina[0].exercicios[0]; // 3 séries, 6–10, +5 kg
+const barra = rotina[4].exercicios.find((e) => e.id === 'barra-fixa')!; // peso do corpo
 
 const resumo = (data: string, treinoId: string, registradas = 3, alteradoEm = `${data}T20:00:00Z`): ResumoSessao => ({
   data,
@@ -57,7 +57,7 @@ describe('Sugestão de carga', () => {
 });
 
 describe('Próximo treino', () => {
-  it('sem sessões, começa pelo primeiro da rotina', () => {
+  it('sem sessões, começa pelo primeiro da ficha', () => {
     expect(proximoTreino(rotina, []).id).toBe('pernas-a');
   });
   it('segue a sequência, não o dia da semana (faltou terça, quarta abre o seguinte ao último feito)', () => {
