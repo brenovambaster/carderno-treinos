@@ -96,8 +96,14 @@ export function criarServidorSupabase(): Servidor {
       return (await q(sb.rpc('tem_convite'))) === true;
     },
     async rotina() {
+      // `series` também liga treinos a exercícios (muitos-para-muitos), então o PostgREST
+      // precisa saber qual ligação usar; sem isso responde 300 (PGRST201).
       const linhas = await q(
-        sb.from('treinos').select('*, exercicios(*)').order('ordem').order('ordem', { referencedTable: 'exercicios' }),
+        sb
+          .from('treinos')
+          .select('*, exercicios!exercicios_treino_id_fkey(*)')
+          .order('ordem')
+          .order('ordem', { referencedTable: 'exercicios' }),
       );
       return (linhas as Linha[]).map(paraTreino);
     },
