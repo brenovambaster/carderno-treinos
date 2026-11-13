@@ -25,6 +25,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import Typography from '@mui/material/Typography';
 import { useEffect, useMemo, useState } from 'react';
+import { CampoData } from '../componentes/CampoData';
 import { Secao } from '../componentes/Pagina';
 import { useApp } from '../contexto';
 import { chaveSerie, enfileirar, gravarCache, lerCache, pendentes, type ItemFila } from '../dados/armazem';
@@ -348,14 +349,7 @@ export function TelaTreino() {
       </Box>
 
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <TextField
-          type="date"
-          label="Data"
-          value={data}
-          sx={{ maxWidth: 170 }}
-          slotProps={{ htmlInput: { max: hoje }, inputLabel: { shrink: true } }}
-          onChange={(e) => e.target.value && setData(e.target.value)}
-        />
+        <CampoData label="Data" value={data} sx={{ maxWidth: 180 }} onChange={(iso) => iso && setData(iso)} />
         <Box sx={{ textAlign: 'right' }}>
           <Typography sx={{ fontFamily: FONTE_DISPLAY, fontWeight: 700, fontSize: 26, lineHeight: 1, ...NUMEROS }}>
             {feitas}/{todas.length}

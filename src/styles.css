@@ -4,6 +4,3 @@ body,
 #root {
   min-height: 100%;
 }
-input[type='date'] {
-  min-height: 1.4375em;
-}

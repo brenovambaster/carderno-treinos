@@ -6,6 +6,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useState, type FormEvent } from 'react';
+import { CampoData } from '../componentes/CampoData';
 import { hojeISO, idade } from '../lib/datas';
 import { num } from '../lib/formato';
 import { OBJETIVOS, TIPOS_TRABALHO, type Objetivo, type Perfil, type Sexo, type TipoTrabalho } from '../lib/tipos';
@@ -88,12 +89,11 @@ export function FormPerfil({ inicial, comPeso, aoSalvar, aoCancelar, rotuloBotao
           </TextField>
         </Grid>
         <Grid size={6}>
-          <TextField
-            type="date"
+          <CampoData
             label="Nascimento"
             value={f.nascimento}
-            onChange={mudar('nascimento')}
-            slotProps={{ htmlInput: { max: hoje }, inputLabel: { shrink: true } }}
+            abrirEm="ano"
+            onChange={(iso) => mudar('nascimento')({ target: { value: iso } })}
           />
         </Grid>
         <Grid size={6}>

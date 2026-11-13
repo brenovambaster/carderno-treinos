@@ -20,6 +20,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Fragment, useState, type FormEvent } from 'react';
 import { useApp } from '../contexto';
+import { CampoData } from '../componentes/CampoData';
 import { Grafico } from '../componentes/Grafico';
 import { Cabecalho, Secao, Vazio } from '../componentes/Pagina';
 import { FONTE_DISPLAY, NUMEROS } from '../tema';
@@ -86,7 +87,11 @@ export function TelaMedidas() {
     const peso = num(form.peso, 400),
       cintura = num(form.cintura, 250),
       passos = num(form.passos, 100000);
-    if (!form.data || (peso == null && cintura == null && passos == null)) {
+    if (!form.data) {
+      setMsg('Confira a data.');
+      return;
+    }
+    if (peso == null && cintura == null && passos == null) {
       setMsg('Preencha pelo menos o peso ou a cintura.');
       return;
     }
@@ -173,8 +178,7 @@ export function TelaMedidas() {
     onChange: (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value })),
     disabled: !online || salvando,
     slotProps: {
-      htmlInput: { inputMode, autoComplete: 'off', max: k === 'data' ? hoje : undefined },
-      inputLabel: k === 'data' ? { shrink: true } : undefined,
+      htmlInput: { inputMode, autoComplete: 'off' },
       input: unidade ? { endAdornment: <InputAdornment position="end">{unidade}</InputAdornment> } : undefined,
     },
   });
@@ -195,7 +199,12 @@ export function TelaMedidas() {
           {!online && <Alert severity="warning">Sem conexão: as medidas precisam de internet para salvar.</Alert>}
           <Grid container spacing={2}>
             <Grid size={6}>
-              <TextField type="date" label="Data" {...campoForm('data')} />
+              <CampoData
+                label="Data"
+                value={form.data}
+                disabled={!online || salvando}
+                onChange={(iso) => setForm((f) => ({ ...f, data: iso }))}
+              />
             </Grid>
             <Grid size={6}>
               <TextField label="Peso" placeholder="75,0" {...campoForm('peso', 'kg', 'decimal')} />
